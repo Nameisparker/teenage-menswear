@@ -7,6 +7,7 @@
  * "Admins read all orders" policy. Neither is expressed here in application
  * code — the database decides.
  */
+import "server-only";
 import { getSupabaseServerClient } from "./supabase/server";
 import type { OrderStatus } from "./supabase/database.types";
 
@@ -40,22 +41,6 @@ export type Order = {
   };
   lines: OrderLine[];
   events: OrderEvent[];
-};
-
-/** The customer-facing stages, in order. Cancelled is handled separately. */
-export const TRACKING_STAGES: OrderStatus[] = [
-  "pending",
-  "confirmed",
-  "shipped",
-  "delivered",
-];
-
-export const STATUS_LABELS: Record<OrderStatus, string> = {
-  pending: "Order placed",
-  confirmed: "Confirmed",
-  shipped: "Shipped",
-  delivered: "Delivered",
-  cancelled: "Cancelled",
 };
 
 const ORDER_SELECT = `

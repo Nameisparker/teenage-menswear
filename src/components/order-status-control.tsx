@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { setOrderStatus } from "@/app/admin/actions";
-import { STATUS_LABELS } from "@/lib/orders";
+import { STATUS_LABELS } from "@/lib/order-status";
 import type { OrderStatus } from "@/lib/supabase/database.types";
 
 const ALL_STATUSES: OrderStatus[] = [

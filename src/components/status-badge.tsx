@@ -1,4 +1,4 @@
-import { STATUS_LABELS } from "@/lib/orders";
+import { STATUS_LABELS } from "@/lib/order-status";
 import type { OrderStatus } from "@/lib/supabase/database.types";
 
 /** Colours are tokenised per status so the badge reads the same everywhere. */

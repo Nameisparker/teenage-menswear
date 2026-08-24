@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { getMyOrders, STATUS_LABELS } from "@/lib/orders";
+import { getMyOrders } from "@/lib/orders";
+import { STATUS_LABELS } from "@/lib/order-status";
 import { formatPrice } from "@/lib/format";
 import { StatusBadge } from "@/components/status-badge";
 

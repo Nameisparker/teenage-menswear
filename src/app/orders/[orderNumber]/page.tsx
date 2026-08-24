@@ -1,10 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import {
-  getOrderByNumber,
-  STATUS_LABELS,
-  TRACKING_STAGES,
-} from "@/lib/orders";
+import { getOrderByNumber } from "@/lib/orders";
+import { STATUS_LABELS, TRACKING_STAGES } from "@/lib/order-status";
 import { formatPrice } from "@/lib/format";
 import { ProductImage } from "@/components/product-image";
 import { StatusBadge } from "@/components/status-badge";
