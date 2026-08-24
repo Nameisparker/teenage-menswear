@@ -21,7 +21,7 @@ export function PendingCartAdd() {
     const pending = takePendingCartAdd();
     if (!pending) return;
 
-    addItem(pending.product, pending.size, pending.quantity);
+    void addItem(pending.product, pending.size, pending.quantity);
     setAdded(`${pending.product.name} (${pending.size})`);
   }, [user, loading, addItem]);
 

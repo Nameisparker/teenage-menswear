@@ -33,6 +33,7 @@ try {
       "node_modules/typescript/bin/tsc",
       "src/lib/products.ts",
       "src/lib/types.ts",
+      "src/lib/store.ts",
       "--outDir",
       work,
       "--module",
@@ -52,6 +53,9 @@ try {
   const { PRODUCTS, CATEGORIES } = await import(
     pathToFileURL(join(work, "products.js")).href
   );
+  // Store details come from store.ts rather than being duplicated below, so
+  // there is exactly one place to edit them.
+  const { STORE } = await import(pathToFileURL(join(work, "store.js")).href);
 
   /** Single-quote a SQL string literal, doubling any embedded quote. */
   const q = (value) =>
@@ -80,9 +84,9 @@ try {
 insert into public.store_settings
   (id, name, short_name, tagline, address, phone_display, phone_href)
 values
-  (true, 'Teenage Menswear', 'Teenage', 'Everyday menswear, done right.',
-   'Kudankulam Road, Radhapuram, Tirunelveli - 627111',
-   '+91 93846 26894', 'tel:+919384626894')
+  (true, ${q(STORE.name)}, ${q(STORE.shortName)}, ${q(STORE.tagline)},
+   ${q(STORE.address)},
+   ${q(STORE.phoneDisplay)}, ${q(STORE.phoneHref)})
 on conflict (id) do update set
   name          = excluded.name,
   short_name    = excluded.short_name,

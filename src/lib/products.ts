@@ -1,3 +1,11 @@
+/**
+ * SEED SOURCE — not read at runtime any more.
+ *
+ * The storefront reads products from the database (see src/lib/catalog.ts).
+ * This file is the input to `npm run seed:sql`, which regenerates
+ * supabase/migrations/20260824000001_seed_catalog.sql. Edit here, regenerate,
+ * re-apply.
+ */
 import type { Category, Product } from "./types";
 
 export const CATEGORIES: { value: Category; label: string }[] = [

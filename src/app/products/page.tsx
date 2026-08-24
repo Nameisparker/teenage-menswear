@@ -1,17 +1,22 @@
 import Link from "next/link";
-import { CATEGORIES, getProductsByCategory } from "@/lib/products";
-import type { Category } from "@/lib/types";
+import { getCategories, getProductsByCategory } from "@/lib/catalog";
 import { ProductCard } from "@/components/product-card";
+
+/** Re-fetch the catalog at most once a minute so edits show up without a deploy. */
+export const revalidate = 60;
 
 export default async function ProductsPage(props: PageProps<"/products">) {
   const { category } = await props.searchParams;
+  const CATEGORIES = await getCategories();
+
+  // Validate against the fetched list — the set of categories is data now, so
+  // an unknown ?category= must fall back to "all" rather than query for it.
   const activeCategory =
-    typeof category === "string" &&
-    CATEGORIES.some((c) => c.value === category)
-      ? (category as Category)
+    typeof category === "string" && CATEGORIES.some((c) => c.value === category)
+      ? category
       : undefined;
 
-  const products = getProductsByCategory(activeCategory);
+  const products = await getProductsByCategory(activeCategory);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">

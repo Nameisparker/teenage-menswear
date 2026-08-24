@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "@/context/cart-context";
+import { getCategories, getStoreSettings } from "@/lib/catalog";
 import { AuthProvider } from "@/context/auth-context";
 import { AuthModal } from "@/components/auth-modal";
 import { PendingCartAdd } from "@/components/pending-cart-add";
@@ -18,13 +19,25 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Teenage Menswear — Shirts, Pants, Tees & Accessories",
-  description:
-    "Teenage Menswear — everyday menswear essentials: shirts, pants, tees, and accessories. Kudankulam Road, Radhapuram, Tirunelveli.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const [store, categories] = await Promise.all([
+    getStoreSettings(),
+    getCategories(),
+  ]);
+  const categoryList = categories.map((c) => c.label).join(", ");
+  return {
+    title: `${store.name} — ${categoryList}`,
+    description: `${store.name} — ${store.tagline} ${categoryList}. ${store.address}.`,
+  };
+}
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // Fetched here so the client-side Header can render category links.
+  const [categories, store] = await Promise.all([
+    getCategories(),
+    getStoreSettings(),
+  ]);
+
   return (
     <html
       lang="en"
@@ -33,7 +46,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         <AuthProvider>
           <CartProvider>
-            <Header />
+            <Header categories={categories} storeName={store.name} />
             <main className="flex-1">{children}</main>
             <Footer />
             <AuthModal />

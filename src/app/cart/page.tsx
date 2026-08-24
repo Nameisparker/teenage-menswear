@@ -6,7 +6,16 @@ import { formatPrice } from "@/lib/format";
 import { ProductImage } from "@/components/product-image";
 
 export default function CartPage() {
-  const { items, updateQuantity, removeItem, totalPrice } = useCart();
+  const { items, updateQuantity, removeItem, totalPrice, loading } = useCart();
+
+  // Without this the cart flashes "empty" before the fetch resolves.
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+        <p className="text-zinc-500 dark:text-zinc-400">Loading your cart…</p>
+      </div>
+    );
+  }
 
   if (items.length === 0) {
     return (
@@ -62,7 +71,7 @@ export default function CartPage() {
                   <button
                     type="button"
                     onClick={() =>
-                      updateQuantity(item.slug, item.size, item.quantity - 1)
+                      void updateQuantity(item.slug, item.size, item.quantity - 1)
                     }
                     className="flex h-8 w-8 items-center justify-center rounded-md border border-black/15 dark:border-white/20"
                     aria-label="Decrease quantity"
@@ -75,7 +84,7 @@ export default function CartPage() {
                   <button
                     type="button"
                     onClick={() =>
-                      updateQuantity(item.slug, item.size, item.quantity + 1)
+                      void updateQuantity(item.slug, item.size, item.quantity + 1)
                     }
                     className="flex h-8 w-8 items-center justify-center rounded-md border border-black/15 dark:border-white/20"
                     aria-label="Increase quantity"
@@ -85,7 +94,7 @@ export default function CartPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => removeItem(item.slug, item.size)}
+                  onClick={() => void removeItem(item.slug, item.size)}
                   className="text-sm text-zinc-500 hover:text-black hover:underline dark:text-zinc-400 dark:hover:text-white"
                 >
                   Remove

@@ -1,22 +1,30 @@
 import { notFound } from "next/navigation";
-import { PRODUCTS, getProductBySlug } from "@/lib/products";
+import { getProductBySlug, getProductSlugs, getStoreSettings } from "@/lib/catalog";
 import { formatPrice } from "@/lib/format";
 import { ProductImage } from "@/components/product-image";
 import { AddToCartButton } from "@/components/add-to-cart-button";
 
-export function generateStaticParams() {
-  return PRODUCTS.map((product) => ({ slug: product.slug }));
+export const revalidate = 60;
+
+export async function generateStaticParams() {
+  const slugs = await getProductSlugs();
+  return slugs.map((slug) => ({ slug }));
 }
 
 export async function generateMetadata(props: PageProps<"/products/[slug]">) {
   const { slug } = await props.params;
-  const product = getProductBySlug(slug);
-  return { title: product ? `${product.name} — THREAD` : "Product not found" };
+  const [product, store] = await Promise.all([
+    getProductBySlug(slug),
+    getStoreSettings(),
+  ]);
+  return {
+    title: product ? `${product.name} — ${store.name}` : "Product not found",
+  };
 }
 
 export default async function ProductPage(props: PageProps<"/products/[slug]">) {
   const { slug } = await props.params;
-  const product = getProductBySlug(slug);
+  const product = await getProductBySlug(slug);
 
   if (!product) notFound();
 

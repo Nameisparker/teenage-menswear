@@ -21,7 +21,7 @@ export function AddToCartButton({ product }: { product: Product }) {
       return;
     }
 
-    addItem(product, size);
+    void addItem(product, size);
     setAdded(true);
     setTimeout(() => setAdded(false), 1500);
   }

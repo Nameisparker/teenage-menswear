@@ -4,11 +4,11 @@
  * Every function returns the same `Product` / category shapes the components
  * already consume, so pages swap their import and nothing else changes.
  *
- * Server-side only — these run in Server Components and use the request-scoped
- * client. The catalog tables are world-readable under RLS, so no session is
- * needed to browse.
+ * Server-side only. Uses the session-less anon client so these pages stay
+ * statically renderable; the catalog is world-readable under RLS, so no
+ * session is needed to browse.
  */
-import { getSupabaseServerClient } from "./supabase/server";
+import { getSupabaseAnonClient } from "./supabase/anon";
 import type {
   CategoryRow,
   ProductWithRelations,
@@ -16,10 +16,17 @@ import type {
 } from "./supabase/database.types";
 import type { Product } from "./types";
 
-/** Columns needed to render a product, plus its category slug and sizes. */
+/**
+ * Columns needed to render a product, plus its category slug and sizes.
+ *
+ * `!inner` matters: without it, a filter on `categories.slug` does not restrict
+ * the parent rows at all — PostgREST returns every product and merely nullifies
+ * the embed, so category filtering silently returns the whole catalog. The join
+ * is safe to make inner unconditionally because products.category_id is NOT NULL.
+ */
 const PRODUCT_SELECT = `
   id, slug, name, price, description, image_path, featured, category_id,
-  categories ( slug, label ),
+  categories!inner ( slug, label ),
   product_variants ( size, sort_order, stock )
 `;
 
@@ -39,8 +46,8 @@ class CatalogUnavailableError extends Error {
   }
 }
 
-async function client() {
-  const supabase = await getSupabaseServerClient();
+function client() {
+  const supabase = getSupabaseAnonClient();
   if (!supabase) {
     throw new CatalogUnavailableError(
       "Supabase is not configured — NEXT_PUBLIC_SUPABASE_URL / _ANON_KEY missing"
@@ -71,7 +78,7 @@ function toProduct(row: ProductWithRelations): Product {
 export async function getCategories(): Promise<
   { value: string; label: string }[]
 > {
-  const supabase = await client();
+  const supabase = client();
   const { data, error } = await supabase
     .from("categories")
     .select("slug, label, sort_order")
@@ -87,7 +94,7 @@ export async function getCategories(): Promise<
 export async function getProductsByCategory(
   category?: string
 ): Promise<Product[]> {
-  const supabase = await client();
+  const supabase = client();
   let query = supabase.from("products").select(PRODUCT_SELECT).order("name");
 
   // Filter on the joined category's slug so callers never deal in uuids.
@@ -102,7 +109,7 @@ export async function getProductsByCategory(
 export async function getProductBySlug(
   slug: string
 ): Promise<Product | undefined> {
-  const supabase = await client();
+  const supabase = client();
   const { data, error } = await supabase
     .from("products")
     .select(PRODUCT_SELECT)
@@ -116,7 +123,7 @@ export async function getProductBySlug(
 }
 
 export async function getFeaturedProducts(): Promise<Product[]> {
-  const supabase = await client();
+  const supabase = client();
   const { data, error } = await supabase
     .from("products")
     .select(PRODUCT_SELECT)
@@ -130,7 +137,7 @@ export async function getFeaturedProducts(): Promise<Product[]> {
 
 /** All product slugs, for generateStaticParams. */
 export async function getProductSlugs(): Promise<string[]> {
-  const supabase = await client();
+  const supabase = client();
   const { data, error } = await supabase.from("products").select("slug");
 
   if (error) throw new CatalogUnavailableError(error.message);
@@ -138,7 +145,7 @@ export async function getProductSlugs(): Promise<string[]> {
 }
 
 export async function getStoreSettings(): Promise<StoreSettingsRow> {
-  const supabase = await client();
+  const supabase = client();
   const { data, error } = await supabase
     .from("store_settings")
     .select("name, short_name, tagline, address, phone_display, phone_href")
