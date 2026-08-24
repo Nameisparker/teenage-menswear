@@ -16,8 +16,16 @@ import { clearPendingCartAdd } from "@/lib/pending-cart";
 
 type AuthResult = { error: string | null };
 
+export type UserRole = "customer" | "admin";
+
 type AuthContextValue = {
   user: User | null;
+  /**
+   * Role from public.profiles. Null until it has been fetched — check
+   * `loading` before treating null as "not an admin".
+   */
+  role: UserRole | null;
+  isAdmin: boolean;
   /** True until the initial session check settles — gate UI on this. */
   loading: boolean;
   /** False when Supabase env vars are missing; the modal explains the setup. */
@@ -27,6 +35,7 @@ type AuthContextValue = {
   closeAuth: () => void;
   sendOtp: (phone: string) => Promise<AuthResult>;
   verifyOtp: (phone: string, token: string) => Promise<AuthResult>;
+  signInWithEmail: (email: string, password: string) => Promise<AuthResult>;
   signInWithGoogle: (redirectPath?: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
 };
@@ -36,6 +45,9 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 /** Supabase errors are developer-facing; map the common ones to plain English. */
 function friendlyError(message: string) {
   const lower = message.toLowerCase();
+  if (lower.includes("invalid login credentials")) {
+    return "That email or password is not right.";
+  }
   if (lower.includes("invalid") && lower.includes("token")) {
     return "That code is not right. Check it and try again.";
   }
@@ -62,6 +74,7 @@ function friendlyError(message: string) {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [role, setRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(isSupabaseConfigured);
   const [authOpen, setAuthOpen] = useState(false);
 
@@ -79,6 +92,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => data.subscription.unsubscribe();
   }, []);
+
+  // Role lives in the database, not the JWT, so it needs its own fetch. RLS
+  // limits this select to the caller's own profile row.
+  useEffect(() => {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase || !user) {
+      setRole(null);
+      return;
+    }
+
+    let cancelled = false;
+    void supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return;
+        // Default to the least privileged role if the row is missing.
+        setRole(((data?.role as UserRole | undefined) ?? "customer") || null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   const openAuth = useCallback(() => setAuthOpen(true), []);
 
@@ -111,6 +150,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const signInWithEmail = useCallback(
+    async (email: string, password: string): Promise<AuthResult> => {
+      const supabase = getSupabaseBrowserClient();
+      if (!supabase) return { error: "Sign-in is not configured yet." };
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      return { error: error ? friendlyError(error.message) : null };
+    },
+    []
+  );
+
   const signInWithGoogle = useCallback(
     async (redirectPath?: string): Promise<AuthResult> => {
       const supabase = getSupabaseBrowserClient();
@@ -134,11 +187,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!supabase) return;
     await supabase.auth.signOut();
     setUser(null);
+    setRole(null);
   }, []);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
+      role,
+      isAdmin: role === "admin",
       loading,
       configured: isSupabaseConfigured,
       authOpen,
@@ -146,17 +202,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       closeAuth,
       sendOtp,
       verifyOtp,
+      signInWithEmail,
       signInWithGoogle,
       signOut,
     }),
     [
       user,
+      role,
       loading,
       authOpen,
       openAuth,
       closeAuth,
       sendOtp,
       verifyOtp,
+      signInWithEmail,
       signInWithGoogle,
       signOut,
     ]
