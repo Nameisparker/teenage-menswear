@@ -4,9 +4,11 @@ import { useState } from "react";
 import Link from "next/link";
 import { CATEGORIES } from "@/lib/products";
 import { useCart } from "@/context/cart-context";
+import { displayNameFor, useAuth } from "@/context/auth-context";
 
 export function Header() {
   const { totalItems } = useCart();
+  const { user, loading, openAuth, signOut } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -43,17 +45,46 @@ export function Header() {
           ))}
         </nav>
 
-        <Link
-          href="/cart"
-          className="relative flex items-center gap-2 text-sm font-medium"
-        >
-          Cart
-          {totalItems > 0 && (
-            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-xs text-accent-foreground">
-              {totalItems}
-            </span>
-          )}
-        </Link>
+        <div className="flex items-center gap-4 sm:gap-5">
+          {!loading &&
+            (user ? (
+              <div className="flex items-center gap-2 text-sm">
+                <span
+                  className="hidden max-w-[10rem] truncate font-medium sm:inline"
+                  title={displayNameFor(user)}
+                >
+                  {displayNameFor(user)}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => void signOut()}
+                  className="text-zinc-600 underline-offset-2 transition-colors hover:text-black hover:underline dark:text-zinc-400 dark:hover:text-white"
+                >
+                  Sign out
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={openAuth}
+                className="text-sm font-medium text-zinc-600 transition-colors hover:text-black dark:text-zinc-400 dark:hover:text-white"
+              >
+                Sign in
+              </button>
+            ))}
+
+          <Link
+            href="/cart"
+            className="relative flex items-center gap-2 text-sm font-medium"
+          >
+            Cart
+            {totalItems > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-xs text-accent-foreground">
+                {totalItems}
+              </span>
+            )}
+          </Link>
+        </div>
       </div>
 
       {menuOpen && (

@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "@/context/cart-context";
+import { AuthProvider } from "@/context/auth-context";
+import { AuthModal } from "@/components/auth-modal";
+import { PendingCartAdd } from "@/components/pending-cart-add";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 
@@ -28,11 +31,15 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <CartProvider>
-          <Header />
-          <main className="flex-1">{children}</main>
-          <Footer />
-        </CartProvider>
+        <AuthProvider>
+          <CartProvider>
+            <Header />
+            <main className="flex-1">{children}</main>
+            <Footer />
+            <AuthModal />
+            <PendingCartAdd />
+          </CartProvider>
+        </AuthProvider>
       </body>
     </html>
   );
