@@ -18,6 +18,87 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
+## Database (Supabase)
+
+The schema lives in `supabase/migrations/`, applied in filename order:
+
+| Migration | Contents |
+| --- | --- |
+| `20260824000000_init_schema.sql` | Tables, indexes, enum, and RLS policies |
+| `20260824000001_seed_catalog.sql` | 4 categories, 40 products, 169 size variants, store settings |
+| `20260824000002_auth_profile_trigger.sql` | Optional: auto-creates a profile on signup |
+
+### Tables
+
+| Table | Purpose | Access under RLS |
+| --- | --- | --- |
+| `categories` | Category slugs and labels | Public read |
+| `products` | Catalog, `is_active` for soft delete | Public read where active |
+| `product_variants` | One row per size, with per-size `stock` | Public read |
+| `store_settings` | Store name, address, phone (single row) | Public read |
+| `profiles` | Mirror of `auth.users`, filled by a signup trigger | Own row only |
+| `addresses` | Saved shipping addresses | Own rows only |
+| `cart_items` | Server-side cart, so it follows the customer | Own rows only |
+| `orders` | Placed orders, shipping details snapshotted | Insert + read own; no update |
+| `order_items` | Line items, name/price snapshotted at purchase | Insert + read own |
+
+Design notes worth knowing before you extend it:
+
+- **RLS is on for every table.** A table with RLS on and no matching policy denies
+  everything, so each one grants exactly what it needs. Catalog writes have no
+  policy at all — seeding and admin edits go through the SQL editor or the
+  `service_role` key, never the browser.
+- **Customers cannot update or delete orders.** Otherwise a shopper could rewrite
+  a total or mark their own order delivered. Status changes belong to admin
+  tooling running as `service_role`.
+- **Orders snapshot everything.** Shipping details and line-item name/price/image
+  are copied onto the order rather than joined, so later catalog edits or a
+  deleted address never rewrite order history.
+- **Money is whole rupees** (integer), matching `formatPrice`. If fractional
+  pricing is ever needed, migrate to paise — never to a float.
+
+### Applying it
+
+**Paste one file at a time**, in filename order, and check for an error before
+moving on. The SQL Editor runs a pasted batch as a single transaction, so one
+rejected statement silently rolls back everything in that paste — which looks
+identical to "nothing happened".
+
+The third file is optional and expected to fail on some projects: creating a
+trigger on `auth.users` needs ownership of that table. If it errors with
+`must be owner of relation users`, skip it — the app upserts its own profile row
+on sign-in, and `profiles` has an insert policy for exactly that.
+
+Or use the CLI, which applies each migration in its own transaction:
+
+```bash
+supabase link --project-ref etcoozatxtprnigjuzuk
+supabase db push
+```
+
+Then confirm what actually landed:
+
+```bash
+npm run check:db
+```
+
+It reads with the anon key, so it verifies what the browser will really see:
+expected row counts on the catalog, and that RLS blocks anon from customer data.
+
+The seed is idempotent — every insert upserts on its natural key, so re-running
+is safe and updates existing rows.
+
+### Changing the catalog
+
+`supabase/migrations/20260824000001_seed_catalog.sql` is generated, not
+hand-written. Edit `src/lib/products.ts`, then:
+
+```bash
+npm run seed:sql
+```
+
+That keeps the SQL from drifting from the data the app ships with.
+
 ## Authentication (Supabase)
 
 Adding an item to the cart requires a signed-in shopper. Sign-in is either a

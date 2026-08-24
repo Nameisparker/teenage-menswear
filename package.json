@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "check:auth": "node scripts/check-auth-config.mjs"
+    "check:auth": "node scripts/check-auth-config.mjs",
+    "seed:sql": "node scripts/gen-catalog-seed.mjs",
+    "check:db": "node scripts/check-db.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

@@ -1,4 +1,9 @@
-export type Category = "shirts" | "pants" | "tees" | "accessories";
+/**
+ * A category slug. Categories live in the database now, so this cannot be a
+ * closed union — the set is only known at runtime. Validate against the
+ * fetched category list rather than relying on the compiler.
+ */
+export type Category = string;
 
 export type Product = {
   id: string;
