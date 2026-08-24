@@ -236,3 +236,18 @@ export function displayNameFor(user: User) {
   const name = (meta.full_name ?? meta.name) as string | undefined;
   return name || user.phone || user.email || "Account";
 }
+
+/** Provider profile picture, when the sign-in method supplied one. */
+export function avatarUrlFor(user: User) {
+  const meta = user.user_metadata ?? {};
+  const url = (meta.avatar_url ?? meta.picture) as string | undefined;
+  return url || null;
+}
+
+/** Up to two initials, for the avatar fallback when there is no picture. */
+export function initialsFor(user: User) {
+  const words = displayNameFor(user).trim().split(/\s+/).filter(Boolean);
+  // A phone number or email has no words to work with, so take one character.
+  if (words.length < 2) return (words[0]?.[0] ?? "?").toUpperCase();
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+}

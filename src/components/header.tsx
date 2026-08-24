@@ -3,7 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useCart } from "@/context/cart-context";
-import { displayNameFor, useAuth } from "@/context/auth-context";
+import { useAuth } from "@/context/auth-context";
+import { ProfileMenu } from "@/components/profile-menu";
 
 /** Categories are fetched by the layout (a Server Component) and passed in,
  * since this component is client-side and cannot query the database itself. */
@@ -15,7 +16,7 @@ export function Header({
   storeName: string;
 }) {
   const { totalItems } = useCart();
-  const { user, loading, isAdmin, openAuth, signOut } = useAuth();
+  const { user, loading, openAuth } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
 
   // The wordmark stacks the first word over the rest ("Teenage Menswear" ->
@@ -64,36 +65,7 @@ export function Header({
         <div className="flex items-center gap-4 sm:gap-5">
           {!loading &&
             (user ? (
-              <div className="flex items-center gap-3 text-sm">
-                {isAdmin ? (
-                  <Link
-                    href="/admin/products"
-                    className="font-medium text-accent underline-offset-2 hover:underline"
-                  >
-                    Admin
-                  </Link>
-                ) : (
-                  <Link
-                    href="/orders"
-                    className="hidden text-zinc-600 transition-colors hover:text-black dark:text-zinc-400 dark:hover:text-white sm:inline"
-                  >
-                    My orders
-                  </Link>
-                )}
-                <span
-                  className="hidden max-w-[8rem] truncate font-medium sm:inline"
-                  title={displayNameFor(user)}
-                >
-                  {displayNameFor(user)}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => void signOut()}
-                  className="text-zinc-600 underline-offset-2 transition-colors hover:text-black hover:underline dark:text-zinc-400 dark:hover:text-white"
-                >
-                  Sign out
-                </button>
-              </div>
+              <ProfileMenu />
             ) : (
               <button
                 type="button"
@@ -140,15 +112,6 @@ export function Header({
           >
             All Products
           </Link>
-          {user && (
-            <Link
-              href={isAdmin ? "/admin/products" : "/orders"}
-              onClick={() => setMenuOpen(false)}
-              className="rounded-md px-2 py-2 text-zinc-600 transition-colors hover:bg-black/5 hover:text-black dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white"
-            >
-              {isAdmin ? "Admin" : "My orders"}
-            </Link>
-          )}
         </nav>
       )}
     </header>
