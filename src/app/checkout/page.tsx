@@ -3,11 +3,23 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useCart } from "@/context/cart-context";
+import { useAuth } from "@/context/auth-context";
 import { formatPrice } from "@/lib/format";
+import { digitsOnly } from "@/lib/phone";
 
 export default function CheckoutPage() {
   const { items, totalPrice, clearCart } = useCart();
+  const { user } = useAuth();
   const [placed, setPlaced] = useState(false);
+
+  // Items can only reach the cart while signed in, so prefill what we know
+  // rather than making the user retype it.
+  const meta = user?.user_metadata ?? {};
+  const prefill = {
+    name: ((meta.full_name ?? meta.name) as string | undefined) ?? "",
+    email: user?.email ?? "",
+    phone: user?.phone ? digitsOnly(user.phone).slice(-10) : "",
+  };
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -49,7 +61,12 @@ export default function CheckoutPage() {
 
   return (
     <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 sm:grid-cols-2">
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      {/* Remount when the session resolves so the prefilled defaults apply. */}
+      <form
+        key={user?.id ?? "anonymous"}
+        onSubmit={handleSubmit}
+        className="flex flex-col gap-4"
+      >
         <h1 className="mb-2 text-2xl font-semibold">Checkout</h1>
 
         <label className="flex flex-col gap-1 text-sm font-medium">
@@ -57,6 +74,7 @@ export default function CheckoutPage() {
           <input
             required
             type="text"
+            defaultValue={prefill.name}
             className="rounded-md border border-black/15 px-3 py-2 text-sm dark:border-white/20 dark:bg-transparent"
           />
         </label>
@@ -66,6 +84,7 @@ export default function CheckoutPage() {
           <input
             required
             type="email"
+            defaultValue={prefill.email}
             className="rounded-md border border-black/15 px-3 py-2 text-sm dark:border-white/20 dark:bg-transparent"
           />
         </label>
@@ -77,6 +96,7 @@ export default function CheckoutPage() {
             type="tel"
             pattern="[0-9]{10}"
             placeholder="10-digit mobile number"
+            defaultValue={prefill.phone}
             className="rounded-md border border-black/15 px-3 py-2 text-sm dark:border-white/20 dark:bg-transparent"
           />
         </label>

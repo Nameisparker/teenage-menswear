@@ -2,14 +2,25 @@
 
 import { useState } from "react";
 import { useCart } from "@/context/cart-context";
+import { useAuth } from "@/context/auth-context";
+import { savePendingCartAdd } from "@/lib/pending-cart";
 import type { Product } from "@/lib/types";
 
 export function AddToCartButton({ product }: { product: Product }) {
   const { addItem } = useCart();
+  const { user, loading, openAuth } = useAuth();
   const [size, setSize] = useState(product.sizes[0]);
   const [added, setAdded] = useState(false);
 
   function handleAdd() {
+    // Not signed in: park the intent and let the modal take over. PendingCartAdd
+    // finishes the add once sign-in succeeds, including after a Google redirect.
+    if (!user) {
+      savePendingCartAdd(product, size);
+      openAuth();
+      return;
+    }
+
     addItem(product, size);
     setAdded(true);
     setTimeout(() => setAdded(false), 1500);
@@ -42,10 +53,17 @@ export function AddToCartButton({ product }: { product: Product }) {
       <button
         type="button"
         onClick={handleAdd}
-        className="flex h-12 w-full items-center justify-center rounded-full bg-accent px-5 font-medium text-accent-foreground transition-opacity hover:opacity-90"
+        disabled={loading}
+        className="flex h-12 w-full items-center justify-center rounded-full bg-accent px-5 font-medium text-accent-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
       >
         {added ? "Added to cart" : "Add to cart"}
       </button>
+
+      {!loading && !user && (
+        <p className="text-center text-xs text-zinc-500 dark:text-zinc-400">
+          You&apos;ll be asked to sign in with your mobile number or Google.
+        </p>
+      )}
     </div>
   );
 }
