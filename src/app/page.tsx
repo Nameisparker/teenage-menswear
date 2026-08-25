@@ -10,7 +10,7 @@ import {
 import { ProductCard } from "@/components/product-card";
 import { ProductImage } from "@/components/product-image";
 import { LandingIntro } from "@/components/landing-intro";
-import CircularGallery from "@/components/circular-gallery";
+import { CircularGallerySection } from "@/components/circular-gallery-section";
 
 export const revalidate = 60;
 
@@ -172,16 +172,7 @@ export default async function Home() {
             </p>
           </div>
         </div>
-        <div style={{ height: 420, position: "relative" }}>
-          <CircularGallery
-            items={galleryItems}
-            bend={2}
-            textColor="#ffffff"
-            borderRadius={0.06}
-            scrollEase={0.03}
-            font="700 22px Arial, Helvetica, sans-serif"
-          />
-        </div>
+        <CircularGallerySection items={galleryItems} />
       </section>
 
       {/* Shop by category */}

@@ -15,6 +15,25 @@ type PlacedOrder = {
   total: number;
 };
 
+/** Maps a place_order failure onto something a customer can act on. */
+function checkoutError(message: string): string {
+  const lower = message.toLowerCase();
+  if (lower.includes("cart is empty")) return "Your cart is empty.";
+  if (lower.includes("not signed in")) {
+    return "Your session expired. Please sign in again.";
+  }
+  if (lower.includes("pin_code")) {
+    return "That PIN code doesn’t look right — it should be 6 digits.";
+  }
+  if (lower.includes("violates") || lower.includes("constraint")) {
+    return "Some of those details weren’t accepted. Please check and retry.";
+  }
+  if (lower.includes("fetch") || lower.includes("network")) {
+    return "We couldn’t reach the server. Check your connection and retry.";
+  }
+  return "We couldn’t place your order. Please try again in a moment.";
+}
+
 export default function CheckoutPage() {
   const { items, totalPrice, totalListPrice, loading, refresh } = useCart();
   const { user } = useAuth();
@@ -59,11 +78,11 @@ export default function CheckoutPage() {
       .single();
 
     if (rpcError) {
-      setError(
-        rpcError.message.includes("Cart is empty")
-          ? "Your cart is empty."
-          : rpcError.message
-      );
+      // Postgres messages are for developers: they name functions, columns,
+      // and constraints. Log the real one, show the customer something they
+      // can act on.
+      console.error("place_order failed", rpcError);
+      setError(checkoutError(rpcError.message));
       setSubmitting(false);
       return;
     }

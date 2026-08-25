@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
-import { getProductBySlug, getProductSlugs, getStoreSettings } from "@/lib/catalog";
+import { getProductBySlug, getProductSlugs } from "@/lib/catalog";
+import { SITE_URL } from "@/lib/site";
 import { Price } from "@/components/price";
 import { ProductImage } from "@/components/product-image";
 import { AddToCartButton } from "@/components/add-to-cart-button";
@@ -13,12 +14,27 @@ export async function generateStaticParams() {
 
 export async function generateMetadata(props: PageProps<"/products/[slug]">) {
   const { slug } = await props.params;
-  const [product, store] = await Promise.all([
-    getProductBySlug(slug),
-    getStoreSettings(),
-  ]);
+  const product = await getProductBySlug(slug);
+
+  // The store name comes from the title template in the root layout, so it
+  // must not be appended again here. This also drops a second query that ran
+  // on every product page purely to spell out the shop’s own name.
+  if (!product) return { title: "Product not found" };
+
+  const description =
+    product.description.slice(0, 200) || `${product.name} at ${SITE_URL}`;
+
   return {
-    title: product ? `${product.name} — ${store.name}` : "Product not found",
+    title: product.name,
+    description,
+    alternates: { canonical: `/products/${product.slug}` },
+    openGraph: {
+      type: "website",
+      title: product.name,
+      description,
+      url: `/products/${product.slug}`,
+      images: [{ url: product.image }],
+    },
   };
 }
 

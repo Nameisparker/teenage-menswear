@@ -136,7 +136,26 @@ export function CartProvider({ children }: { children: ReactNode }) {
     setFetched(result);
   }, []);
 
-  /** Re-reads the cart. Used by every mutation, and exposed as `refresh`. */
+  /**
+   * Applies an edit to the rows already on screen, without a round trip.
+   *
+   * Quantity and removal both change a line the browser already has complete
+   * price data for, so the recomputed total is exact rather than a guess. The
+   * write still goes to the database; if it fails the caller re-reads, and the
+   * server wins.
+   */
+  const patchItems = useCallback(
+    (userId: string, update: (items: CartItem[]) => CartItem[]) => {
+      setFetched((current) =>
+        current && current.userId === userId
+          ? { userId, items: update(current.items) }
+          : current
+      );
+    },
+    []
+  );
+
+  /** Re-reads the cart. Used on failure to reconcile, and exposed as `refresh`. */
   const load = useCallback(async () => {
     applyFetch(await fetchCart());
   }, [fetchCart, applyFetch]);
@@ -188,6 +207,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
       );
       if (!target) return;
 
+      patchItems(user.id, (current) =>
+        current.filter(
+          (item) =>
+            !(item.productId === target.productId && item.size === size)
+        )
+      );
+
       const { error: deleteError } = await supabase
         .from("cart_items")
         .delete()
@@ -196,11 +222,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
       if (deleteError) {
         setLoadError(deleteError.message);
-        return;
+        await load();
       }
-      await load();
     },
-    [user, items, load]
+    [user, items, load, patchItems]
   );
 
   const updateQuantity = useCallback(
@@ -218,6 +243,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
       );
       if (!target) return;
 
+      patchItems(user.id, (current) =>
+        current.map((item) =>
+          item.productId === target.productId && item.size === size
+            ? { ...item, quantity }
+            : item
+        )
+      );
+
       const { error: updateError } = await supabase
         .from("cart_items")
         .update({ quantity })
@@ -226,11 +259,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
       if (updateError) {
         setLoadError(updateError.message);
-        return;
+        await load();
       }
-      await load();
     },
-    [user, items, load, removeItem]
+    [user, items, load, removeItem, patchItems]
   );
 
   const clearCart = useCallback(async () => {

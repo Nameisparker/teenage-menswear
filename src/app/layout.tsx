@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { CartProvider } from "@/context/cart-context";
 import { getCategories, getStoreSettings } from "@/lib/catalog";
+import { SITE_URL } from "@/lib/site";
 import { AuthProvider } from "@/context/auth-context";
 import { AuthModal } from "@/components/auth-modal";
 import { PendingCartAdd } from "@/components/pending-cart-add";
@@ -25,9 +26,25 @@ export async function generateMetadata(): Promise<Metadata> {
     getCategories(),
   ]);
   const categoryList = categories.map((c) => c.label).join(", ");
+  const description = `${store.name} — ${store.tagline} ${categoryList}. ${store.address}.`;
+
   return {
-    title: `${store.name} — ${categoryList}`,
-    description: `${store.name} — ${store.tagline} ${categoryList}. ${store.address}.`,
+    // Makes every relative URL in per-page metadata resolve to an absolute
+    // one, which Open Graph and Twitter cards require.
+    metadataBase: new URL(SITE_URL),
+    title: {
+      default: `${store.name} — ${categoryList}`,
+      // Page titles read "Breton Stripe Tee — Teenage Menswear".
+      template: `%s — ${store.name}`,
+    },
+    description,
+    openGraph: {
+      type: "website",
+      siteName: store.name,
+      title: `${store.name} — ${categoryList}`,
+      description,
+      url: SITE_URL,
+    },
   };
 }
 
