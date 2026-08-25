@@ -14,6 +14,11 @@ export interface CircularGalleryProps {
   fontUrl?: string;
   scrollSpeed?: number;
   scrollEase?: number;
+  /**
+   * Amount added to the scroll target each frame, in the same units as an
+   * item's width. 0 disables the drift. Ignored under prefers-reduced-motion.
+   */
+  autoScrollSpeed?: number;
 }
 
 declare function CircularGallery(props: CircularGalleryProps): ReactElement;

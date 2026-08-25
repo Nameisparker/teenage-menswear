@@ -17,8 +17,13 @@ export async function GET(request: Request) {
   const next = safeNext(url.searchParams.get("next"));
   const destination = new URL(next, url.origin);
 
+  // `||`, not `??`: Google sends `error_description=` empty alongside a real
+  // `error=access_denied`, and `??` would keep the empty string and let the
+  // request fall through to the misleading "missing code" branch below.
   const providerError =
-    url.searchParams.get("error_description") ?? url.searchParams.get("error");
+    url.searchParams.get("error_description") ||
+    url.searchParams.get("error") ||
+    null;
   if (providerError) {
     destination.searchParams.set("auth_error", providerError);
     return NextResponse.redirect(destination);

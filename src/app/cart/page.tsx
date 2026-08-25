@@ -4,14 +4,39 @@ import Link from "next/link";
 import { useCart } from "@/context/cart-context";
 import { formatPrice } from "@/lib/format";
 import { ProductImage } from "@/components/product-image";
+import { Price } from "@/components/price";
 
 export default function CartPage() {
-  const { items, updateQuantity, removeItem, totalPrice } = useCart();
+  const {
+    items,
+    updateQuantity,
+    removeItem,
+    totalPrice,
+    totalListPrice,
+    loading,
+    error,
+  } = useCart();
+
+  // Without this the cart flashes "empty" before the fetch resolves.
+  if (loading) {
+    return (
+      <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+        <p className="text-zinc-500 dark:text-zinc-400">Loading your cart…</p>
+      </div>
+    );
+  }
 
   if (items.length === 0) {
     return (
       <div className="mx-auto flex max-w-6xl flex-col items-start gap-4 px-4 py-16 sm:px-6">
-        <h1 className="text-2xl font-semibold">Your cart is empty</h1>
+        <h1 className="text-2xl font-semibold">
+          {error ? "We couldn’t load your cart" : "Your cart is empty"}
+        </h1>
+        {error && (
+          <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+            {error}
+          </p>
+        )}
         <Link
           href="/products"
           className="flex h-12 items-center justify-center rounded-full bg-black px-6 font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
@@ -25,6 +50,15 @@ export default function CartPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
       <h1 className="mb-8 text-2xl font-semibold">Your cart</h1>
+
+      {error && (
+        <p
+          role="alert"
+          className="mb-6 rounded-md border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300"
+        >
+          {error}
+        </p>
+      )}
 
       <div className="flex flex-col gap-6">
         {items.map((item) => (
@@ -52,9 +86,13 @@ export default function CartPage() {
                     Size: {item.size}
                   </p>
                 </div>
-                <p className="font-medium">
-                  {formatPrice(item.price * item.quantity)}
-                </p>
+                <Price
+                  price={item.price}
+                  offerPrice={item.offerPrice}
+                  discountPercent={item.discountPercent}
+                  quantity={item.quantity}
+                  className="font-medium"
+                />
               </div>
 
               <div className="flex items-center gap-4">
@@ -62,7 +100,7 @@ export default function CartPage() {
                   <button
                     type="button"
                     onClick={() =>
-                      updateQuantity(item.slug, item.size, item.quantity - 1)
+                      void updateQuantity(item.slug, item.size, item.quantity - 1)
                     }
                     className="flex h-8 w-8 items-center justify-center rounded-md border border-black/15 dark:border-white/20"
                     aria-label="Decrease quantity"
@@ -75,7 +113,7 @@ export default function CartPage() {
                   <button
                     type="button"
                     onClick={() =>
-                      updateQuantity(item.slug, item.size, item.quantity + 1)
+                      void updateQuantity(item.slug, item.size, item.quantity + 1)
                     }
                     className="flex h-8 w-8 items-center justify-center rounded-md border border-black/15 dark:border-white/20"
                     aria-label="Increase quantity"
@@ -85,7 +123,7 @@ export default function CartPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => removeItem(item.slug, item.size)}
+                  onClick={() => void removeItem(item.slug, item.size)}
                   className="text-sm text-zinc-500 hover:text-black hover:underline dark:text-zinc-400 dark:hover:text-white"
                 >
                   Remove
@@ -97,9 +135,23 @@ export default function CartPage() {
       </div>
 
       <div className="mt-8 flex flex-col items-end gap-4">
-        <div className="flex w-full max-w-xs justify-between text-lg font-semibold sm:w-64">
-          <span>Total</span>
-          <span>{formatPrice(totalPrice)}</span>
+        <div className="flex w-full max-w-xs flex-col gap-1 sm:w-64">
+          {totalListPrice > totalPrice && (
+            <>
+              <div className="flex justify-between text-sm text-zinc-500 dark:text-zinc-400">
+                <span>Subtotal</span>
+                <span>{formatPrice(totalListPrice)}</span>
+              </div>
+              <div className="flex justify-between text-sm font-medium text-accent">
+                <span>Discount</span>
+                <span>−{formatPrice(totalListPrice - totalPrice)}</span>
+              </div>
+            </>
+          )}
+          <div className="flex justify-between text-lg font-semibold">
+            <span>Total</span>
+            <span>{formatPrice(totalPrice)}</span>
+          </div>
         </div>
         <Link
           href="/checkout"

@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
 :root {
+  /* Native controls — select popups, scrollbars, date pickers — are painted
+     by the browser, not by us. Without this they stay light while the page
+     turns dark, leaving <option> text unreadable against its own popup. */
+  color-scheme: light;
   --background: #ffffff;
   --foreground: #171717;
   --accent: #b45309;
@@ -12,20 +16,45 @@
   --color-foreground: var(--foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-poppins);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
+    color-scheme: dark;
     --background: #0a0a0a;
     --foreground: #ededed;
     --accent: #d97706;
   }
 }
 
+/* Chrome on Windows paints the <select> popup itself and ignores color-scheme
+   there, so options inherit the page foreground onto a white popup — light-on-
+   light in dark mode. Paint them from the theme tokens instead of trusting the
+   browser default. */
+option {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+option:disabled {
+  color: color-mix(in srgb, var(--foreground) 45%, transparent);
+}
+
+/* The browser styles these as monospace by default, which would reintroduce a
+   second typeface — Courier — in the one place still using <code>. */
+code,
+kbd,
+samp,
+pre {
+  font-family: inherit;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* This previously read `Arial, Helvetica, sans-serif` — a leftover from the
+     create-next-app starter that silently overrode the font loaded in
+     layout.tsx, so the configured typeface never rendered anywhere. */
+  font-family: var(--font-poppins), "Segoe UI", Arial, Helvetica, sans-serif;
 }

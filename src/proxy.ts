@@ -36,7 +36,23 @@ export async function proxy(request: NextRequest) {
   });
 
   // Must run before the response is committed, or a refresh mid-flight is lost.
-  await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  // Bounce signed-out visitors away from gated areas so they get the sign-in
+  // prompt rather than a redirect loop inside the layout.
+  //
+  // This is convenience, NOT authorisation: proxy runs outside render, and a
+  // Server Function is a POST to the page it lives on, so a matcher change
+  // could silently drop coverage. /admin is authorised in its layout and,
+  // finally, by RLS — see app/admin/layout.tsx.
+  const gated = ["/admin", "/orders"];
+  if (!user && gated.some((path) => request.nextUrl.pathname.startsWith(path))) {
+    const home = new URL("/", request.url);
+    home.searchParams.set("auth_error", "Sign in to continue");
+    return NextResponse.redirect(home);
+  }
 
   return response;
 }

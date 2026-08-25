@@ -1,13 +1,25 @@
 import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { CATEGORIES, getFeaturedProducts, getProductBySlug } from "@/lib/products";
-import { STORE } from "@/lib/store";
+import {
+  getCategories,
+  getFeaturedProducts,
+  getProductBySlug,
+  getStoreSettings,
+} from "@/lib/catalog";
 import { ProductCard } from "@/components/product-card";
 import { ProductImage } from "@/components/product-image";
 import { LandingIntro } from "@/components/landing-intro";
-import CircularGallery from "@/components/circular-gallery";
+import { CircularGallerySection } from "@/components/circular-gallery-section";
 
+export const revalidate = 60;
+
+/**
+ * Editorial imagery for the category tiles. Keyed by category slug and keyed
+ * deliberately in code, not the database: these are hand-picked shots, not
+ * catalog data. A category with no entry here still renders — see the fallback
+ * in the tile below.
+ */
 const CATEGORY_PREVIEWS: Record<
   string,
   { image: string; description: string }
@@ -37,9 +49,24 @@ const ONE_PER_CATEGORY_SLUGS = [
   "gold-curb-chain",
 ];
 
-export default function Home() {
-  const featured = getFeaturedProducts();
-  const oneOfEach = ONE_PER_CATEGORY_SLUGS.map((slug) => getProductBySlug(slug)).filter(
+export default async function Home() {
+  const [featured, CATEGORIES, settings, picks] = await Promise.all([
+    getFeaturedProducts(),
+    getCategories(),
+    getStoreSettings(),
+    Promise.all(ONE_PER_CATEGORY_SLUGS.map((slug) => getProductBySlug(slug))),
+  ]);
+
+  // Keep the existing STORE shape so the markup below is untouched.
+  const STORE = {
+    name: settings.name,
+    tagline: settings.tagline,
+    address: settings.address,
+    phoneHref: settings.phone_href,
+    phoneDisplay: settings.phone_display,
+  };
+
+  const oneOfEach = picks.filter(
     (product): product is NonNullable<typeof product> => Boolean(product)
   );
   const galleryItems = oneOfEach.map((product) => ({
@@ -145,16 +172,7 @@ export default function Home() {
             </p>
           </div>
         </div>
-        <div style={{ height: 420, position: "relative" }}>
-          <CircularGallery
-            items={galleryItems}
-            bend={2}
-            textColor="#ffffff"
-            borderRadius={0.06}
-            scrollEase={0.03}
-            font="700 22px Arial, Helvetica, sans-serif"
-          />
-        </div>
+        <CircularGallerySection items={galleryItems} />
       </section>
 
       {/* Shop by category */}
@@ -169,7 +187,12 @@ export default function Home() {
         </div>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           {CATEGORIES.map((category) => {
-            const preview = CATEGORY_PREVIEWS[category.value];
+            // A category added in the database won't have editorial imagery, so
+            // fall back rather than crashing on an undefined preview.
+            const preview = CATEGORY_PREVIEWS[category.value] ?? {
+              image: oneOfEach[0]?.image ?? "/hero/model.jpg",
+              description: `Shop ${category.label.toLowerCase()}`,
+            };
             return (
               <Link
                 key={category.value}

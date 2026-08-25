@@ -25,10 +25,18 @@ export function AuthModal() {
 }
 
 function AuthDialog() {
-  const { closeAuth, configured, sendOtp, verifyOtp, signInWithGoogle } =
-    useAuth();
+  const {
+    closeAuth,
+    configured,
+    sendOtp,
+    verifyOtp,
+    signInWithEmail,
+    signInWithGoogle,
+  } = useAuth();
 
-  const [step, setStep] = useState<"phone" | "otp">("phone");
+  const [step, setStep] = useState<"phone" | "otp" | "email">("phone");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [dialCode, setDialCode] = useState(DEFAULT_DIAL_CODE);
   const [national, setNational] = useState("");
   const [code, setCode] = useState("");
@@ -93,6 +101,19 @@ function AuthDialog() {
     }
   }
 
+  async function handleEmail() {
+    if (busy || !email || !password) return;
+    setBusy(true);
+    setError(null);
+
+    const { error: emailError } = await signInWithEmail(email, password);
+    // On success the provider closes this modal, so only failure needs handling.
+    if (emailError) {
+      setError(emailError);
+      setBusy(false);
+    }
+  }
+
   async function handleGoogle() {
     if (busy) return;
     setBusy(true);
@@ -122,12 +143,16 @@ function AuthDialog() {
         <div className="mb-5 flex items-start justify-between gap-4">
           <div className="flex flex-col gap-1">
             <h2 id="auth-modal-title" className="text-lg font-semibold">
-              {step === "phone" ? "Sign in to add to cart" : "Enter the code"}
+              {step === "otp"
+                ? "Enter the code"
+                : step === "email"
+                  ? "Sign in with email"
+                  : "Sign in to add to cart"}
             </h2>
             <p className="text-sm text-zinc-600 dark:text-zinc-400">
-              {step === "phone"
-                ? "We keep your cart and orders tied to your account."
-                : `Sent to ${formatPhoneForDisplay(e164)}`}
+              {step === "otp"
+                ? `Sent to ${formatPhoneForDisplay(e164)}`
+                : "We keep your cart and orders tied to your account."}
             </p>
           </div>
           <button
@@ -153,9 +178,9 @@ function AuthDialog() {
         {!configured && (
           <p className="mb-4 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
             Sign-in is not configured. Add{" "}
-            <code className="font-mono">NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
-            <code className="font-mono">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> to{" "}
-            <code className="font-mono">.env.local</code>, then restart the dev
+            <code>NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
+            <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> to{" "}
+            <code>.env.local</code>, then restart the dev
             server.
           </p>
         )}
@@ -196,11 +221,7 @@ function AuthDialog() {
                   className="rounded-md border border-black/15 bg-transparent px-2 py-2 text-sm dark:border-white/20"
                 >
                   {DIAL_CODES.map((entry) => (
-                    <option
-                      key={entry.code}
-                      value={entry.code}
-                      className="text-black"
-                    >
+                    <option key={entry.code} value={entry.code}>
                       {entry.label}
                     </option>
                   ))}
@@ -231,7 +252,80 @@ function AuthDialog() {
                 {busy ? "Sending..." : "Send code"}
               </button>
             </form>
+
+            <button
+              type="button"
+              onClick={() => {
+                setStep("email");
+                setError(null);
+              }}
+              className="text-sm text-zinc-600 underline-offset-2 hover:underline dark:text-zinc-400"
+            >
+              Use email and password instead
+            </button>
           </div>
+        ) : step === "email" ? (
+          <form
+            className="flex flex-col gap-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void handleEmail();
+            }}
+          >
+            <label htmlFor="auth-email" className="text-sm font-medium">
+              Email
+            </label>
+            <input
+              id="auth-email"
+              type="email"
+              autoComplete="email"
+              autoFocus
+              required
+              value={email}
+              onChange={(event) => {
+                setEmail(event.target.value);
+                setError(null);
+              }}
+              className="rounded-md border border-black/15 bg-transparent px-3 py-2 text-sm dark:border-white/20"
+            />
+
+            <label htmlFor="auth-password" className="text-sm font-medium">
+              Password
+            </label>
+            <input
+              id="auth-password"
+              type="password"
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(event) => {
+                setPassword(event.target.value);
+                setError(null);
+              }}
+              className="rounded-md border border-black/15 bg-transparent px-3 py-2 text-sm dark:border-white/20"
+            />
+
+            {error && <ErrorText>{error}</ErrorText>}
+
+            <button
+              type="submit"
+              disabled={busy || !configured || !email || !password}
+              className="mt-1 flex h-12 w-full items-center justify-center rounded-full bg-accent font-medium text-accent-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+            >
+              {busy ? "Signing in..." : "Sign in"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setStep("phone");
+                setError(null);
+              }}
+              className="text-sm text-zinc-600 underline-offset-2 hover:underline dark:text-zinc-400"
+            >
+              Back to other sign-in options
+            </button>
+          </form>
         ) : (
           <form
             className="flex flex-col gap-3"

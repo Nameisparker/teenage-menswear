@@ -1,8 +1,21 @@
 import Link from "next/link";
-import { CATEGORIES } from "@/lib/products";
-import { STORE } from "@/lib/store";
+import { getCategories, getStoreSettings } from "@/lib/catalog";
 
-export function Footer() {
+export async function Footer() {
+  const [CATEGORIES, settings] = await Promise.all([
+    getCategories(),
+    getStoreSettings(),
+  ]);
+
+  // Same shape the markup already used.
+  const STORE = {
+    name: settings.name,
+    tagline: settings.tagline,
+    address: settings.address,
+    phoneHref: settings.phone_href,
+    phoneDisplay: settings.phone_display,
+  };
+
   return (
     <footer className="border-t border-black/10 bg-zinc-50 dark:border-white/10 dark:bg-zinc-950">
       <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">

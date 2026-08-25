@@ -394,12 +394,20 @@ class App {
       borderRadius = 0,
       font = "bold 30px Figtree",
       scrollSpeed = 2,
-      scrollEase = 0.05
+      scrollEase = 0.05,
+      autoScrollSpeed = 0
     } = {}
   ) {
     document.documentElement.classList.remove("no-js");
     this.container = container;
     this.scrollSpeed = scrollSpeed;
+    // A carousel that never stops moving is the textbook reduced-motion
+    // offender, so the drift is dropped outright for anyone who asked for
+    // less animation. Dragging and the arrow keys still work.
+    const reduceMotion =
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    this.autoScrollSpeed = reduceMotion ? 0 : autoScrollSpeed;
+    this.paused = false;
     this.scroll = { ease: scrollEase, current: 0, target: 0, last: 0 };
     this.onCheckDebounce = debounce(this.onCheck, 200);
     this.createRenderer();
@@ -541,6 +549,12 @@ class App {
     }
   }
   update() {
+    // Nudging the target rather than the position keeps the existing easing
+    // in charge, so the drift is smooth and a drag can still fight it. The
+    // wrap-around in Media.update() means it never reaches an end.
+    if (this.autoScrollSpeed && !this.isDown && !this.paused) {
+      this.scroll.target += this.autoScrollSpeed;
+    }
     this.scroll.current = lerp(this.scroll.current, this.scroll.target, this.scroll.ease);
     const direction = this.scroll.current > this.scroll.last ? "right" : "left";
     if (this.medias) {
@@ -557,6 +571,13 @@ class App {
     this.boundOnTouchMove = this.onTouchMove.bind(this);
     this.boundOnTouchUp = this.onTouchUp.bind(this);
     this.boundOnKeyDown = this.onKeyDown.bind(this);
+    // Hovering means someone is reading a label; a tab in the background
+    // means nobody is watching at all. Both should stop the conveyor.
+    this.boundOnPointerEnter = () => { this.paused = true; };
+    this.boundOnPointerLeave = () => { this.paused = false; };
+    this.boundOnVisibility = () => {
+      this.paused = document.hidden;
+    };
 
     window.addEventListener("resize", this.boundOnResize);
     window.addEventListener("mousewheel", this.boundOnWheel);
@@ -569,6 +590,9 @@ class App {
     window.addEventListener("touchend", this.boundOnTouchUp);
 
     this.container?.addEventListener("keydown", this.boundOnKeyDown);
+    this.container?.addEventListener("pointerenter", this.boundOnPointerEnter);
+    this.container?.addEventListener("pointerleave", this.boundOnPointerLeave);
+    document.addEventListener("visibilitychange", this.boundOnVisibility);
   }
   destroy() {
     window.cancelAnimationFrame(this.raf);
@@ -585,8 +609,12 @@ class App {
       this.renderer.gl.canvas.parentNode.removeChild(this.renderer.gl.canvas);
     }
 
+    document.removeEventListener("visibilitychange", this.boundOnVisibility);
+
     if (this.container) {
       this.container.removeEventListener("keydown", this.boundOnKeyDown);
+      this.container.removeEventListener("pointerenter", this.boundOnPointerEnter);
+      this.container.removeEventListener("pointerleave", this.boundOnPointerLeave);
     }
   }
 }
@@ -599,7 +627,8 @@ export default function CircularGallery({
   font = "bold 30px Figtree",
   fontUrl,
   scrollSpeed = 2,
-  scrollEase = 0.05
+  scrollEase = 0.05,
+  autoScrollSpeed = 0
 }) {
   const containerRef = useRef(null);
   useEffect(() => {
@@ -615,7 +644,8 @@ export default function CircularGallery({
         borderRadius,
         font: resolvedFont,
         scrollSpeed,
-        scrollEase
+        scrollEase,
+        autoScrollSpeed
       });
     });
 
@@ -623,7 +653,7 @@ export default function CircularGallery({
       isMounted = false;
       if (app) app.destroy();
     };
-  }, [items, bend, textColor, borderRadius, font, fontUrl, scrollSpeed, scrollEase]);
+  }, [items, bend, textColor, borderRadius, font, fontUrl, scrollSpeed, scrollEase, autoScrollSpeed]);
   return (
     <div
       className="circular-gallery"

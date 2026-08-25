@@ -16,8 +16,16 @@ import { clearPendingCartAdd } from "@/lib/pending-cart";
 
 type AuthResult = { error: string | null };
 
+export type UserRole = "customer" | "admin";
+
 type AuthContextValue = {
   user: User | null;
+  /**
+   * Role from public.profiles. Null until it has been fetched — check
+   * `loading` before treating null as "not an admin".
+   */
+  role: UserRole | null;
+  isAdmin: boolean;
   /** True until the initial session check settles — gate UI on this. */
   loading: boolean;
   /** False when Supabase env vars are missing; the modal explains the setup. */
@@ -27,6 +35,7 @@ type AuthContextValue = {
   closeAuth: () => void;
   sendOtp: (phone: string) => Promise<AuthResult>;
   verifyOtp: (phone: string, token: string) => Promise<AuthResult>;
+  signInWithEmail: (email: string, password: string) => Promise<AuthResult>;
   signInWithGoogle: (redirectPath?: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
 };
@@ -36,6 +45,9 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 /** Supabase errors are developer-facing; map the common ones to plain English. */
 function friendlyError(message: string) {
   const lower = message.toLowerCase();
+  if (lower.includes("invalid login credentials")) {
+    return "That email or password is not right.";
+  }
   if (lower.includes("invalid") && lower.includes("token")) {
     return "That code is not right. Check it and try again.";
   }
@@ -62,6 +74,10 @@ function friendlyError(message: string) {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [fetchedRole, setFetchedRole] = useState<{
+    userId: string;
+    role: UserRole;
+  } | null>(null);
   const [loading, setLoading] = useState(isSupabaseConfigured);
   const [authOpen, setAuthOpen] = useState(false);
 
@@ -79,6 +95,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => data.subscription.unsubscribe();
   }, []);
+
+  // Role lives in the database, not the JWT, so it needs its own fetch. RLS
+  // limits this select to the caller's own profile row.
+  useEffect(() => {
+    const supabase = getSupabaseBrowserClient();
+    // Nothing to fetch when signed out — `role` below already reads as null.
+    if (!supabase || !user) return;
+
+    let cancelled = false;
+    void supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled) return;
+        // Default to the least privileged role if the row is missing.
+        setFetchedRole({
+          userId: user.id,
+          role: (data?.role as UserRole | undefined) ?? "customer",
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  // Derived, not stored: a fetched role belongs to the account it was fetched
+  // for. Reading it back through the current user id means signing out — or
+  // switching accounts — cannot leave the previous account’s role in place
+  // while the next fetch is still in flight.
+  const role =
+    user && fetchedRole?.userId === user.id ? fetchedRole.role : null;
 
   const openAuth = useCallback(() => setAuthOpen(true), []);
 
@@ -105,6 +155,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         phone,
         token,
         type: "sms",
+      });
+      return { error: error ? friendlyError(error.message) : null };
+    },
+    []
+  );
+
+  const signInWithEmail = useCallback(
+    async (email: string, password: string): Promise<AuthResult> => {
+      const supabase = getSupabaseBrowserClient();
+      if (!supabase) return { error: "Sign-in is not configured yet." };
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
       });
       return { error: error ? friendlyError(error.message) : null };
     },
@@ -139,6 +203,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
+      role,
+      isAdmin: role === "admin",
       loading,
       configured: isSupabaseConfigured,
       authOpen,
@@ -146,17 +212,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       closeAuth,
       sendOtp,
       verifyOtp,
+      signInWithEmail,
       signInWithGoogle,
       signOut,
     }),
     [
       user,
+      role,
       loading,
       authOpen,
       openAuth,
       closeAuth,
       sendOtp,
       verifyOtp,
+      signInWithEmail,
       signInWithGoogle,
       signOut,
     ]
@@ -176,4 +245,19 @@ export function displayNameFor(user: User) {
   const meta = user.user_metadata ?? {};
   const name = (meta.full_name ?? meta.name) as string | undefined;
   return name || user.phone || user.email || "Account";
+}
+
+/** Provider profile picture, when the sign-in method supplied one. */
+export function avatarUrlFor(user: User) {
+  const meta = user.user_metadata ?? {};
+  const url = (meta.avatar_url ?? meta.picture) as string | undefined;
+  return url || null;
+}
+
+/** Up to two initials, for the avatar fallback when there is no picture. */
+export function initialsFor(user: User) {
+  const words = displayNameFor(user).trim().split(/\s+/).filter(Boolean);
+  // A phone number or email has no words to work with, so take one character.
+  if (words.length < 2) return (words[0]?.[0] ?? "?").toUpperCase();
+  return (words[0][0] + words[words.length - 1][0]).toUpperCase();
 }

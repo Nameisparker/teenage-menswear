@@ -2,14 +2,28 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { CATEGORIES } from "@/lib/products";
 import { useCart } from "@/context/cart-context";
-import { displayNameFor, useAuth } from "@/context/auth-context";
+import { useAuth } from "@/context/auth-context";
+import { ProfileMenu } from "@/components/profile-menu";
+import { NotificationBell } from "@/components/notification-bell";
 
-export function Header() {
+/** Categories are fetched by the layout (a Server Component) and passed in,
+ * since this component is client-side and cannot query the database itself. */
+export function Header({
+  categories,
+  storeName,
+}: {
+  categories: { value: string; label: string }[];
+  storeName: string;
+}) {
   const { totalItems } = useCart();
-  const { user, loading, openAuth, signOut } = useAuth();
+  const { user, loading, isAdmin, openAuth } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  // The wordmark stacks the first word over the rest ("Teenage Menswear" ->
+  // TEENAGE / MENSWEAR). A single-word store name just renders one line.
+  const [firstWord, ...restWords] = storeName.split(" ");
+  const secondLine = restWords.join(" ");
 
   return (
     <header className="sticky top-0 z-10 border-b border-black/10 bg-white/90 backdrop-blur dark:border-white/10 dark:bg-black/90">
@@ -26,15 +40,19 @@ export function Header() {
           </button>
 
           <Link href="/" className="flex flex-col leading-none">
-            <span className="text-lg font-bold tracking-tight">TEENAGE</span>
-            <span className="text-[10px] font-medium tracking-[0.25em] text-accent">
-              MENSWEAR
+            <span className="text-lg font-bold tracking-tight">
+              {firstWord.toUpperCase()}
             </span>
+            {secondLine && (
+              <span className="text-[10px] font-medium tracking-[0.25em] text-accent">
+                {secondLine.toUpperCase()}
+              </span>
+            )}
           </Link>
         </div>
 
         <nav className="hidden gap-8 text-sm font-medium sm:flex">
-          {CATEGORIES.map((category) => (
+          {categories.map((category) => (
             <Link
               key={category.value}
               href={`/products?category=${category.value}`}
@@ -45,24 +63,15 @@ export function Header() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-4 sm:gap-5">
+        <div className="flex items-center gap-3 sm:gap-4">
           {!loading &&
             (user ? (
-              <div className="flex items-center gap-2 text-sm">
-                <span
-                  className="hidden max-w-[10rem] truncate font-medium sm:inline"
-                  title={displayNameFor(user)}
-                >
-                  {displayNameFor(user)}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => void signOut()}
-                  className="text-zinc-600 underline-offset-2 transition-colors hover:text-black hover:underline dark:text-zinc-400 dark:hover:text-white"
-                >
-                  Sign out
-                </button>
-              </div>
+              <>
+                {/* Admins only: a shopper has no order feed to be told
+                    about, and the provider opens no socket for them. */}
+                {isAdmin && <NotificationBell />}
+                <ProfileMenu />
+              </>
             ) : (
               <button
                 type="button"
@@ -92,7 +101,7 @@ export function Header() {
           data-mobile-menu="true"
           className="flex flex-col gap-1 border-t border-black/10 px-4 py-3 text-sm font-medium dark:border-white/10 sm:hidden"
         >
-          {CATEGORIES.map((category) => (
+          {categories.map((category) => (
             <Link
               key={category.value}
               href={`/products?category=${category.value}`}

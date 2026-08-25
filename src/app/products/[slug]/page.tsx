@@ -1,22 +1,46 @@
 import { notFound } from "next/navigation";
-import { PRODUCTS, getProductBySlug } from "@/lib/products";
-import { formatPrice } from "@/lib/format";
+import { getProductBySlug, getProductSlugs } from "@/lib/catalog";
+import { SITE_URL } from "@/lib/site";
+import { Price } from "@/components/price";
 import { ProductImage } from "@/components/product-image";
 import { AddToCartButton } from "@/components/add-to-cart-button";
 
-export function generateStaticParams() {
-  return PRODUCTS.map((product) => ({ slug: product.slug }));
+export const revalidate = 60;
+
+export async function generateStaticParams() {
+  const slugs = await getProductSlugs();
+  return slugs.map((slug) => ({ slug }));
 }
 
 export async function generateMetadata(props: PageProps<"/products/[slug]">) {
   const { slug } = await props.params;
-  const product = getProductBySlug(slug);
-  return { title: product ? `${product.name} — THREAD` : "Product not found" };
+  const product = await getProductBySlug(slug);
+
+  // The store name comes from the title template in the root layout, so it
+  // must not be appended again here. This also drops a second query that ran
+  // on every product page purely to spell out the shop’s own name.
+  if (!product) return { title: "Product not found" };
+
+  const description =
+    product.description.slice(0, 200) || `${product.name} at ${SITE_URL}`;
+
+  return {
+    title: product.name,
+    description,
+    alternates: { canonical: `/products/${product.slug}` },
+    openGraph: {
+      type: "website",
+      title: product.name,
+      description,
+      url: `/products/${product.slug}`,
+      images: [{ url: product.image }],
+    },
+  };
 }
 
 export default async function ProductPage(props: PageProps<"/products/[slug]">) {
   const { slug } = await props.params;
-  const product = getProductBySlug(slug);
+  const product = await getProductBySlug(slug);
 
   if (!product) notFound();
 
@@ -33,9 +57,13 @@ export default async function ProductPage(props: PageProps<"/products/[slug]">) 
       <div className="flex flex-col gap-6">
         <div>
           <h1 className="text-2xl font-semibold">{product.name}</h1>
-          <p className="mt-1 text-lg text-zinc-500 dark:text-zinc-400">
-            {formatPrice(product.price)}
-          </p>
+          <Price
+            price={product.price}
+            offerPrice={product.offerPrice}
+            discountPercent={product.discountPercent}
+            size="lg"
+            className="mt-2"
+          />
         </div>
 
         <p className="text-zinc-600 dark:text-zinc-400">

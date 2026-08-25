@@ -1,3 +1,11 @@
+/**
+ * SEED SOURCE — not read at runtime any more.
+ *
+ * The storefront reads products from the database (see src/lib/catalog.ts).
+ * This file is the input to `npm run seed:sql`, which regenerates
+ * supabase/migrations/20260824000001_seed_catalog.sql. Edit here, regenerate,
+ * re-apply.
+ */
 import type { Category, Product } from "./types";
 
 export const CATEGORIES: { value: Category; label: string }[] = [
@@ -12,7 +20,16 @@ const SIZES_PANTS = ["30", "32", "34", "36", "38"];
 const SIZES_BELT = ["32", "34", "36", "38"];
 const SIZES_ONE = ["One Size"];
 
-export const PRODUCTS: Product[] = [
+/**
+ * Seed rows carry only the columns a fresh database starts with. Discounts are
+ * not seeded — an admin sets them from /admin/discounts, and offer_price is
+ * derived by the database — so this is Product without its pricing extras.
+ * Re-running the seed leaves existing discounts alone: its upsert never names
+ * those columns.
+ */
+export type SeedProduct = Omit<Product, "discountPercent" | "offerPrice">;
+
+export const PRODUCTS: SeedProduct[] = [
   // Shirts
   {
     id: "shirt-01",
@@ -470,15 +487,15 @@ export const PRODUCTS: Product[] = [
   },
 ];
 
-export function getProductBySlug(slug: string): Product | undefined {
+export function getProductBySlug(slug: string): SeedProduct | undefined {
   return PRODUCTS.find((p) => p.slug === slug);
 }
 
-export function getProductsByCategory(category?: Category): Product[] {
+export function getProductsByCategory(category?: Category): SeedProduct[] {
   if (!category) return PRODUCTS;
   return PRODUCTS.filter((p) => p.category === category);
 }
 
-export function getFeaturedProducts(): Product[] {
+export function getFeaturedProducts(): SeedProduct[] {
   return PRODUCTS.filter((p) => p.featured);
 }
