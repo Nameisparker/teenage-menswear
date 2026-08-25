@@ -21,8 +21,12 @@ export function PendingCartAdd() {
     const pending = takePendingCartAdd();
     if (!pending) return;
 
-    void addItem(pending.product, pending.size, pending.quantity);
-    setAdded(`${pending.product.name} (${pending.size})`);
+    // Announce after the add has actually landed, not before it: the toast
+    // says "Added to cart", and setting state from a promise callback also
+    // keeps this effect from re-rendering synchronously.
+    void addItem(pending.product, pending.size, pending.quantity).then(() => {
+      setAdded(`${pending.product.name} (${pending.size})`);
+    });
   }, [user, loading, addItem]);
 
   useEffect(() => {

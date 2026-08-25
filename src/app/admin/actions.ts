@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { OrderStatus } from "@/lib/supabase/database.types";
+import { MAX_DISCOUNT_PERCENT } from "@/lib/pricing";
 
 /**
  * Admin mutations.
@@ -207,5 +208,47 @@ export async function setOrderStatus(
 
   revalidatePath("/admin/orders");
   revalidatePath("/orders");
+  return { ok: true };
+}
+
+/**
+ * Sets a product's discount. The offer price is not written here — the
+ * products.offer_price generated column derives it, so there is exactly one
+ * place that does the arithmetic and it is the one place that bills.
+ */
+export async function setProductDiscount(
+  productId: string,
+  discountPercent: number
+): Promise<ActionResult> {
+  const { supabase, error: adminError } = await requireAdmin();
+  if (!supabase) return { ok: false, error: adminError ?? "Unauthorised." };
+
+  if (!Number.isInteger(discountPercent)) {
+    return { ok: false, error: "Discount must be a whole number." };
+  }
+  if (discountPercent < 0 || discountPercent > MAX_DISCOUNT_PERCENT) {
+    return {
+      ok: false,
+      error: `Discount must be between 0 and ${MAX_DISCOUNT_PERCENT}%.`,
+    };
+  }
+
+  const { data, error } = await supabase
+    .from("products")
+    .update({ discount_percent: discountPercent })
+    .eq("id", productId)
+    .select("slug")
+    .single();
+
+  if (error) return { ok: false, error: error.message };
+
+  // Catalog pages cache for 60s; an admin should see the new price at once.
+  revalidatePath("/");
+  revalidatePath("/products");
+  revalidatePath(`/products/${(data as { slug: string }).slug}`);
+  revalidatePath("/cart");
+  revalidatePath("/admin/products");
+  revalidatePath("/admin/discounts");
+
   return { ok: true };
 }

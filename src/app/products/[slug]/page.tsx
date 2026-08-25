@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { getProductBySlug, getProductSlugs, getStoreSettings } from "@/lib/catalog";
-import { formatPrice } from "@/lib/format";
+import { Price } from "@/components/price";
 import { ProductImage } from "@/components/product-image";
 import { AddToCartButton } from "@/components/add-to-cart-button";
 
@@ -41,9 +41,13 @@ export default async function ProductPage(props: PageProps<"/products/[slug]">) 
       <div className="flex flex-col gap-6">
         <div>
           <h1 className="text-2xl font-semibold">{product.name}</h1>
-          <p className="mt-1 text-lg text-zinc-500 dark:text-zinc-400">
-            {formatPrice(product.price)}
-          </p>
+          <Price
+            price={product.price}
+            offerPrice={product.offerPrice}
+            discountPercent={product.discountPercent}
+            size="lg"
+            className="mt-2"
+          />
         </div>
 
         <p className="text-zinc-600 dark:text-zinc-400">

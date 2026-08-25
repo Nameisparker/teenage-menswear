@@ -6,6 +6,7 @@ import { useCart } from "@/context/cart-context";
 import { useAuth } from "@/context/auth-context";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { formatPrice } from "@/lib/format";
+import { Price } from "@/components/price";
 import { digitsOnly } from "@/lib/phone";
 
 /** What place_order returns — enough to confirm the order to the customer. */
@@ -15,7 +16,7 @@ type PlacedOrder = {
 };
 
 export default function CheckoutPage() {
-  const { items, totalPrice, loading, refresh } = useCart();
+  const { items, totalPrice, totalListPrice, loading, refresh } = useCart();
   const { user } = useAuth();
   const [placed, setPlaced] = useState<PlacedOrder | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -227,13 +228,32 @@ export default function CheckoutPage() {
               <span>
                 {item.name} ({item.size}) &times; {item.quantity}
               </span>
-              <span>{formatPrice(item.price * item.quantity)}</span>
+              <Price
+                price={item.price}
+                offerPrice={item.offerPrice}
+                discountPercent={item.discountPercent}
+                quantity={item.quantity}
+              />
             </div>
           ))}
         </div>
-        <div className="flex justify-between border-t border-black/10 pt-4 text-lg font-semibold dark:border-white/10">
-          <span>Total</span>
-          <span>{formatPrice(totalPrice)}</span>
+        <div className="flex flex-col gap-1 border-t border-black/10 pt-4 dark:border-white/10">
+          {totalListPrice > totalPrice && (
+            <>
+              <div className="flex justify-between text-sm text-zinc-500 dark:text-zinc-400">
+                <span>Subtotal</span>
+                <span>{formatPrice(totalListPrice)}</span>
+              </div>
+              <div className="flex justify-between text-sm font-medium text-accent">
+                <span>Discount</span>
+                <span>−{formatPrice(totalListPrice - totalPrice)}</span>
+              </div>
+            </>
+          )}
+          <div className="flex justify-between text-lg font-semibold">
+            <span>Total</span>
+            <span>{formatPrice(totalPrice)}</span>
+          </div>
         </div>
       </div>
     </div>

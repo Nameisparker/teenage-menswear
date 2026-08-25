@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
 :root {
+  /* Native controls — select popups, scrollbars, date pickers — are painted
+     by the browser, not by us. Without this they stay light while the page
+     turns dark, leaving <option> text unreadable against its own popup. */
+  color-scheme: light;
   --background: #ffffff;
   --foreground: #171717;
   --accent: #b45309;
@@ -18,10 +22,24 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
+    color-scheme: dark;
     --background: #0a0a0a;
     --foreground: #ededed;
     --accent: #d97706;
   }
+}
+
+/* Chrome on Windows paints the <select> popup itself and ignores color-scheme
+   there, so options inherit the page foreground onto a white popup — light-on-
+   light in dark mode. Paint them from the theme tokens instead of trusting the
+   browser default. */
+option {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+option:disabled {
+  color: color-mix(in srgb, var(--foreground) 45%, transparent);
 }
 
 body {

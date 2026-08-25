@@ -74,7 +74,10 @@ function friendlyError(message: string) {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [role, setRole] = useState<UserRole | null>(null);
+  const [fetchedRole, setFetchedRole] = useState<{
+    userId: string;
+    role: UserRole;
+  } | null>(null);
   const [loading, setLoading] = useState(isSupabaseConfigured);
   const [authOpen, setAuthOpen] = useState(false);
 
@@ -97,10 +100,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // limits this select to the caller's own profile row.
   useEffect(() => {
     const supabase = getSupabaseBrowserClient();
-    if (!supabase || !user) {
-      setRole(null);
-      return;
-    }
+    // Nothing to fetch when signed out — `role` below already reads as null.
+    if (!supabase || !user) return;
 
     let cancelled = false;
     void supabase
@@ -111,13 +112,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then(({ data }) => {
         if (cancelled) return;
         // Default to the least privileged role if the row is missing.
-        setRole(((data?.role as UserRole | undefined) ?? "customer") || null);
+        setFetchedRole({
+          userId: user.id,
+          role: (data?.role as UserRole | undefined) ?? "customer",
+        });
       });
 
     return () => {
       cancelled = true;
     };
   }, [user]);
+
+  // Derived, not stored: a fetched role belongs to the account it was fetched
+  // for. Reading it back through the current user id means signing out — or
+  // switching accounts — cannot leave the previous account’s role in place
+  // while the next fetch is still in flight.
+  const role =
+    user && fetchedRole?.userId === user.id ? fetchedRole.role : null;
 
   const openAuth = useCallback(() => setAuthOpen(true), []);
 
@@ -187,7 +198,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!supabase) return;
     await supabase.auth.signOut();
     setUser(null);
-    setRole(null);
   }, []);
 
   const value = useMemo<AuthContextValue>(

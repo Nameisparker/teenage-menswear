@@ -53,7 +53,7 @@ export function OrderStatusControl({
         className="rounded-md border border-black/15 bg-transparent px-2 py-1.5 text-sm disabled:opacity-60 dark:border-white/20"
       >
         {ALL_STATUSES.map((option) => (
-          <option key={option} value={option} className="text-black">
+          <option key={option} value={option}>
             {STATUS_LABELS[option]}
           </option>
         ))}

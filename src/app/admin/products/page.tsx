@@ -56,7 +56,20 @@ export default async function AdminProductsPage() {
                 <td className="py-3 pr-3 text-zinc-600 dark:text-zinc-400">
                   {product.categorySlug}
                 </td>
-                <td className="py-3 pr-3">{formatPrice(product.price)}</td>
+                <td className="py-3 pr-3 whitespace-nowrap">
+                  {product.discountPercent > 0 ? (
+                    <div className="flex flex-col">
+                      <span className="font-medium text-accent">
+                        {formatPrice(product.offerPrice)}
+                      </span>
+                      <span className="text-xs text-zinc-500 line-through dark:text-zinc-400">
+                        {formatPrice(product.price)}
+                      </span>
+                    </div>
+                  ) : (
+                    formatPrice(product.price)
+                  )}
+                </td>
                 <td className="py-3 pr-3 text-zinc-600 dark:text-zinc-400">
                   {product.sizes.join(", ") || "—"}
                 </td>
@@ -65,6 +78,11 @@ export default async function AdminProductsPage() {
                     {!product.isActive && (
                       <span className="rounded-full border border-red-500/40 bg-red-500/10 px-2 py-0.5 text-xs font-semibold text-red-800 dark:text-red-200">
                         Hidden
+                      </span>
+                    )}
+                    {product.discountPercent > 0 && (
+                      <span className="rounded-full border border-accent/40 bg-accent/10 px-2 py-0.5 text-xs font-semibold text-accent">
+                        {product.discountPercent}% off
                       </span>
                     )}
                     {product.featured && (

@@ -13,6 +13,8 @@ export type AdminProduct = {
   slug: string;
   name: string;
   price: number;
+  discountPercent: number;
+  offerPrice: number;
   description: string;
   imagePath: string;
   featured: boolean;
@@ -23,7 +25,7 @@ export type AdminProduct = {
 };
 
 const ADMIN_PRODUCT_SELECT = `
-  id, slug, name, price, description, image_path, featured, is_active, category_id,
+  id, slug, name, price, discount_percent, offer_price, description, image_path, featured, is_active, category_id,
   categories!inner ( slug, label ),
   product_variants ( size, sort_order )
 `;
@@ -33,6 +35,8 @@ type AdminProductRow = {
   slug: string;
   name: string;
   price: number;
+  discount_percent: number;
+  offer_price: number;
   description: string;
   image_path: string;
   featured: boolean;
@@ -48,6 +52,8 @@ function toAdminProduct(row: AdminProductRow): AdminProduct {
     slug: row.slug,
     name: row.name,
     price: row.price,
+    discountPercent: row.discount_percent,
+    offerPrice: row.offer_price,
     description: row.description,
     imagePath: row.image_path,
     featured: row.featured,

@@ -37,10 +37,16 @@ type CartContextValue = {
   /** Re-reads from the database, e.g. after checkout clears it server-side. */
   refresh: () => Promise<void>;
   totalItems: number;
+  /** What the cart actually costs — offer prices, not list prices. */
   totalPrice: number;
+  /** The same cart at list prices. Equal to totalPrice when nothing is on offer. */
+  totalListPrice: number;
 };
 
 const CartContext = createContext<CartContextValue | null>(null);
+
+/** Stable identity, so a signed-out render does not invalidate the memos below. */
+const EMPTY_CART: CartItem[] = [];
 
 /** Row shape returned by the cart select below. */
 type CartRow = {
@@ -52,42 +58,57 @@ type CartRow = {
     slug: string;
     name: string;
     price: number;
+    discount_percent: number;
+    offer_price: number;
     image_path: string;
   } | null;
 };
 
+/** What one cart read produced: rows, a failure, or nothing to do. */
+type CartFetch =
+  | { userId: string; items: CartItem[] }
+  | { userId: string; error: string }
+  | null;
+
 const CART_SELECT =
-  "id, product_id, size, quantity, products!inner ( slug, name, price, image_path )";
+  "id, product_id, size, quantity, products!inner ( slug, name, price, discount_percent, offer_price, image_path )";
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const { user, loading: authLoading } = useAuth();
-  const [items, setItems] = useState<CartItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Rows as last fetched, tagged with the session they were fetched for.
+  const [fetched, setFetched] = useState<{
+    userId: string;
+    items: CartItem[];
+  } | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  // All three are derived rather than cleared on sign-out. That keeps the
+  // effect below free of synchronous setState, and means one customer’s cart
+  // can never be shown under another’s session while a fetch is in flight.
+  const mine = user != null && fetched?.userId === user.id;
+  const items = mine ? fetched.items : EMPTY_CART;
+  const error = user ? loadError : null;
+  const loading = authLoading || (user != null && !mine && loadError === null);
+
+  // Fetching and state-writing are kept apart so the effect below can hand the
+  // write to a promise callback: React must not be told to re-render straight
+  // from an effect body.
+  const fetchCart = useCallback(async (): Promise<CartFetch> => {
     const supabase = getSupabaseBrowserClient();
 
-    if (!supabase || !user) {
-      setItems([]);
-      setLoading(false);
-      return;
-    }
+    // Nothing to fetch when signed out; `items` already reads as empty.
+    if (!supabase || !user) return null;
 
-    const { data, error: loadError } = await supabase
+    const { data, error: readError } = await supabase
       .from("cart_items")
       .select(CART_SELECT)
       .order("created_at");
 
-    if (loadError) {
-      setError(loadError.message);
-      setLoading(false);
-      return;
-    }
+    if (readError) return { userId: user.id, error: readError.message };
 
-    setError(null);
-    setItems(
-      (data as unknown as CartRow[])
+    return {
+      userId: user.id,
+      items: (data as unknown as CartRow[])
         // products is NOT NULL via the inner join, but stay defensive so one
         // odd row cannot blank the whole cart.
         .filter((row) => row.products)
@@ -96,20 +117,44 @@ export function CartProvider({ children }: { children: ReactNode }) {
           slug: row.products!.slug,
           name: row.products!.name,
           price: row.products!.price,
+          discountPercent: row.products!.discount_percent,
+          offerPrice: row.products!.offer_price,
           size: row.size,
           image: row.products!.image_path,
           quantity: row.quantity,
-        }))
-    );
-    setLoading(false);
+        })),
+    };
   }, [user]);
 
-  // Reload whenever the session changes: sign-in pulls the saved cart, sign-out
-  // empties it locally.
+  const applyFetch = useCallback((result: CartFetch) => {
+    if (!result) return;
+    if ("error" in result) {
+      setLoadError(result.error);
+      return;
+    }
+    setLoadError(null);
+    setFetched(result);
+  }, []);
+
+  /** Re-reads the cart. Used by every mutation, and exposed as `refresh`. */
+  const load = useCallback(async () => {
+    applyFetch(await fetchCart());
+  }, [fetchCart, applyFetch]);
+
+  // Reload whenever the session changes: signing in pulls the saved cart, and
+  // signing out needs no work at all because the cart is derived from `user`.
   useEffect(() => {
     if (authLoading) return;
-    void load();
-  }, [authLoading, load]);
+
+    let cancelled = false;
+    void fetchCart().then((result) => {
+      if (!cancelled) applyFetch(result);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, fetchCart, applyFetch]);
 
   const addItem = useCallback(
     async (product: Product, size: string, quantity = 1) => {
@@ -125,7 +170,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       });
 
       if (rpcError) {
-        setError(rpcError.message);
+        setLoadError(rpcError.message);
         return;
       }
       await load();
@@ -150,7 +195,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         .eq("size", size);
 
       if (deleteError) {
-        setError(deleteError.message);
+        setLoadError(deleteError.message);
         return;
       }
       await load();
@@ -180,7 +225,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
         .eq("size", size);
 
       if (updateError) {
-        setError(updateError.message);
+        setLoadError(updateError.message);
         return;
       }
       await load();
@@ -200,17 +245,23 @@ export function CartProvider({ children }: { children: ReactNode }) {
       .eq("user_id", user.id);
 
     if (clearError) {
-      setError(clearError.message);
+      setLoadError(clearError.message);
       return;
     }
-    setItems([]);
+    setFetched({ userId: user.id, items: [] });
   }, [user]);
 
   const totalItems = useMemo(
     () => items.reduce((sum, item) => sum + item.quantity, 0),
     [items]
   );
+  // Charges the offer price. The database re-derives this total in
+  // place_order(), so a stale client here cannot change what is billed.
   const totalPrice = useMemo(
+    () => items.reduce((sum, item) => sum + item.offerPrice * item.quantity, 0),
+    [items]
+  );
+  const totalListPrice = useMemo(
     () => items.reduce((sum, item) => sum + item.price * item.quantity, 0),
     [items]
   );
@@ -227,6 +278,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       refresh: load,
       totalItems,
       totalPrice,
+      totalListPrice,
     }),
     [
       items,
@@ -240,6 +292,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       load,
       totalItems,
       totalPrice,
+      totalListPrice,
     ]
   );
 

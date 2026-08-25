@@ -221,11 +221,7 @@ function AuthDialog() {
                   className="rounded-md border border-black/15 bg-transparent px-2 py-2 text-sm dark:border-white/20"
                 >
                   {DIAL_CODES.map((entry) => (
-                    <option
-                      key={entry.code}
-                      value={entry.code}
-                      className="text-black"
-                    >
+                    <option key={entry.code} value={entry.code}>
                       {entry.label}
                     </option>
                   ))}

@@ -4,9 +4,17 @@ import Link from "next/link";
 import { useCart } from "@/context/cart-context";
 import { formatPrice } from "@/lib/format";
 import { ProductImage } from "@/components/product-image";
+import { Price } from "@/components/price";
 
 export default function CartPage() {
-  const { items, updateQuantity, removeItem, totalPrice, loading } = useCart();
+  const {
+    items,
+    updateQuantity,
+    removeItem,
+    totalPrice,
+    totalListPrice,
+    loading,
+  } = useCart();
 
   // Without this the cart flashes "empty" before the fetch resolves.
   if (loading) {
@@ -61,9 +69,13 @@ export default function CartPage() {
                     Size: {item.size}
                   </p>
                 </div>
-                <p className="font-medium">
-                  {formatPrice(item.price * item.quantity)}
-                </p>
+                <Price
+                  price={item.price}
+                  offerPrice={item.offerPrice}
+                  discountPercent={item.discountPercent}
+                  quantity={item.quantity}
+                  className="font-medium"
+                />
               </div>
 
               <div className="flex items-center gap-4">
@@ -106,9 +118,23 @@ export default function CartPage() {
       </div>
 
       <div className="mt-8 flex flex-col items-end gap-4">
-        <div className="flex w-full max-w-xs justify-between text-lg font-semibold sm:w-64">
-          <span>Total</span>
-          <span>{formatPrice(totalPrice)}</span>
+        <div className="flex w-full max-w-xs flex-col gap-1 sm:w-64">
+          {totalListPrice > totalPrice && (
+            <>
+              <div className="flex justify-between text-sm text-zinc-500 dark:text-zinc-400">
+                <span>Subtotal</span>
+                <span>{formatPrice(totalListPrice)}</span>
+              </div>
+              <div className="flex justify-between text-sm font-medium text-accent">
+                <span>Discount</span>
+                <span>−{formatPrice(totalListPrice - totalPrice)}</span>
+              </div>
+            </>
+          )}
+          <div className="flex justify-between text-lg font-semibold">
+            <span>Total</span>
+            <span>{formatPrice(totalPrice)}</span>
+          </div>
         </div>
         <Link
           href="/checkout"

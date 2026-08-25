@@ -25,7 +25,7 @@ import type { Product } from "./types";
  * is safe to make inner unconditionally because products.category_id is NOT NULL.
  */
 const PRODUCT_SELECT = `
-  id, slug, name, price, description, image_path, featured, category_id,
+  id, slug, name, price, discount_percent, offer_price, description, image_path, featured, category_id,
   categories!inner ( slug, label ),
   product_variants ( size, sort_order, stock )
 `;
@@ -64,6 +64,8 @@ function toProduct(row: ProductWithRelations): Product {
     name: row.name,
     category: row.categories?.slug ?? "",
     price: row.price,
+    discountPercent: row.discount_percent,
+    offerPrice: row.offer_price,
     description: row.description,
     // Sorted here rather than relying on the nested select's order, which
     // Postgres does not guarantee for embedded rows.

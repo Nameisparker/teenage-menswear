@@ -35,6 +35,10 @@ export type ProductRow = {
   slug: string;
   name: string;
   price: number;
+  /** Percent off the list price; 0 when there is no offer. */
+  discount_percent: number;
+  /** Generated from price and discount_percent — read-only. */
+  offer_price: number;
   description: string;
   image_path: string;
   featured: boolean;
@@ -93,6 +97,7 @@ export type OrderRow = {
   ship_line1: string;
   ship_city: string;
   ship_pin_code: string;
+  /** List-price sum before discounts. */
   subtotal: number;
   total: number;
   placed_at: string;
