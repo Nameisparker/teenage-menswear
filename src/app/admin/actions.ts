@@ -44,7 +44,47 @@ async function requireAdmin() {
   return { supabase, error: null as string | null };
 }
 
-/** Replaces a product's size list, preserving stock for sizes that remain. */
+/**
+ * Turns a Postgres error into something an admin can act on.
+ *
+ * Raw messages name constraints, not fields — "duplicate key value violates
+ * unique constraint products_slug_key" does not tell you which box to change.
+ * The original is logged for whoever has to debug it.
+ */
+function friendlyDbError(message: string, fallback: string): string {
+  const lower = message.toLowerCase();
+
+  if (lower.includes("products_slug_key")) {
+    return "That slug is already used by another product. Pick a different one.";
+  }
+  if (lower.includes("duplicate key")) {
+    return "That value is already taken. Try a different one.";
+  }
+  if (lower.includes("discount_percent")) {
+    return `Discount must be between 0 and ${MAX_DISCOUNT_PERCENT}%.`;
+  }
+  if (lower.includes("products_price_check")) {
+    return "Price must be a whole number above zero.";
+  }
+  if (lower.includes("foreign key")) {
+    return "That category no longer exists. Reload the page and try again.";
+  }
+  if (lower.includes("row-level security") || lower.includes("permission denied")) {
+    return "You do not have permission to do that.";
+  }
+  if (lower.includes("fetch") || lower.includes("network")) {
+    return "Could not reach the database. Check your connection and retry.";
+  }
+  return fallback;
+}
+
+/** Logs the real error, returns the readable one. */
+function failed(context: string, message: string, fallback: string): ActionResult {
+  console.error(`${context}:`, message);
+  return { ok: false, error: friendlyDbError(message, fallback) };
+}
+
+/** Replaces a product’s size list, preserving stock for sizes that remain. */
 async function syncVariants(
   supabase: NonNullable<Awaited<ReturnType<typeof getSupabaseServerClient>>>,
   productId: string,
@@ -146,19 +186,25 @@ export async function saveProduct(
 
   if (id) {
     const { error } = await supabase.from("products").update(row).eq("id", id);
-    if (error) return { ok: false, error: error.message };
+    if (error) {
+      return failed("saveProduct update", error.message, "Could not save the product.");
+    }
   } else {
     const { data, error } = await supabase
       .from("products")
       .insert(row)
       .select("id")
       .single();
-    if (error) return { ok: false, error: error.message };
+    if (error) {
+      return failed("saveProduct insert", error.message, "Could not create the product.");
+    }
     productId = (data as { id: string }).id;
   }
 
   const variantError = await syncVariants(supabase, productId, sizes);
-  if (variantError) return { ok: false, error: variantError };
+  if (variantError) {
+    return failed("syncVariants", variantError, "Could not save the sizes.");
+  }
 
   // The storefront caches catalog pages for 60s; drop them now so an admin
   // sees their own edit immediately rather than waiting out the window.
@@ -182,7 +228,9 @@ export async function setProductActive(
     .update({ is_active: isActive })
     .eq("id", productId);
 
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    return failed("setProductActive", error.message, "Could not update visibility.");
+  }
 
   revalidatePath("/");
   revalidatePath("/products");
@@ -204,7 +252,9 @@ export async function setOrderStatus(
     .update({ status })
     .eq("id", orderId);
 
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    return failed("setOrderStatus", error.message, "Could not update the order.");
+  }
 
   revalidatePath("/admin/orders");
   revalidatePath("/orders");
@@ -240,7 +290,9 @@ export async function setProductDiscount(
     .select("slug")
     .single();
 
-  if (error) return { ok: false, error: error.message };
+  if (error) {
+    return failed("setProductDiscount", error.message, "Could not save the discount.");
+  }
 
   // Catalog pages cache for 60s; an admin should see the new price at once.
   revalidatePath("/");

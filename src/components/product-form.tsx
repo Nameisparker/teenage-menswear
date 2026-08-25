@@ -55,6 +55,18 @@ export function ProductForm({
     <form onSubmit={handleSubmit} className="flex max-w-2xl flex-col gap-4">
       {product && <input type="hidden" name="id" value={product.id} />}
 
+      {/* Without this the category select is just a dead "Choose…" and the
+          form cannot be submitted, with nothing on screen explaining why. */}
+      {categories.length === 0 && (
+        <p
+          role="alert"
+          className="rounded-md border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300"
+        >
+          No categories could be loaded, so this product cannot be saved. Reload
+          the page; if it persists, check the database connection.
+        </p>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Name">
           <input

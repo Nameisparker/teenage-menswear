@@ -21,12 +21,23 @@ import type { CartItem, Product } from "@/lib/types";
  * visitor simply has an empty cart — there is no anonymous cart to merge.
  */
 
+export type CartWriteResult = { ok: boolean; error?: string };
+
 type CartContextValue = {
   items: CartItem[];
   /** True while the cart is being fetched for the current session. */
   loading: boolean;
   error: string | null;
-  addItem: (product: Product, size: string, quantity?: number) => Promise<void>;
+  /**
+   * Resolves to the outcome. Callers must not report success on their own:
+   * an add can fail on RLS, a dropped connection, or a retired product, and
+   * a button that says “Added to cart” regardless is lying.
+   */
+  addItem: (
+    product: Product,
+    size: string,
+    quantity?: number
+  ) => Promise<CartWriteResult>;
   removeItem: (slug: string, size: string) => Promise<void>;
   updateQuantity: (
     slug: string,
@@ -176,9 +187,18 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [authLoading, fetchCart, applyFetch]);
 
   const addItem = useCallback(
-    async (product: Product, size: string, quantity = 1) => {
+    async (
+      product: Product,
+      size: string,
+      quantity = 1
+    ): Promise<CartWriteResult> => {
       const supabase = getSupabaseBrowserClient();
-      if (!supabase || !user) return;
+      if (!supabase) return { ok: false, error: "Cart is not configured." };
+      if (!user) return { ok: false, error: "Please sign in first." };
+
+      if (!size) {
+        return { ok: false, error: "Pick a size first." };
+      }
 
       // RPC rather than upsert: incrementing an existing row is not expressible
       // as a plain upsert, and read-then-write races with a double click.
@@ -190,9 +210,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
       if (rpcError) {
         setLoadError(rpcError.message);
-        return;
+        return { ok: false, error: rpcError.message };
       }
       await load();
+      return { ok: true };
     },
     [user, load]
   );

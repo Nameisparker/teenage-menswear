@@ -8,6 +8,16 @@
 import { getSupabaseServerClient } from "./supabase/server";
 import type { OrderStatus } from "./supabase/database.types";
 
+/**
+ * A failed query and an empty table are not the same thing, and returning [] for
+ * both makes a database outage look like "you have no products" — an admin then
+ * re-adds a catalog that never went away. These reads still degrade to empty so a
+ * page never crashes, but the cause is logged rather than swallowed.
+ */
+function logQueryError(context: string, message: string) {
+  console.error(`admin-catalog ${context}:`, message);
+}
+
 export type AdminProduct = {
   id: string;
   slug: string;
@@ -76,7 +86,10 @@ export async function getAllProducts(): Promise<AdminProduct[]> {
     .select(ADMIN_PRODUCT_SELECT)
     .order("name");
 
-  if (error || !data) return [];
+  if (error || !data) {
+    if (error) logQueryError("getAllProducts", error.message);
+    return [];
+  }
   return (data as unknown as AdminProductRow[]).map(toAdminProduct);
 }
 
@@ -92,7 +105,10 @@ export async function getProductById(
     .eq("id", id)
     .maybeSingle();
 
-  if (error || !data) return null;
+  if (error || !data) {
+    if (error) logQueryError("getProductById", error.message);
+    return null;
+  }
   return toAdminProduct(data as unknown as AdminProductRow);
 }
 
@@ -107,7 +123,10 @@ export async function getCategoryOptions(): Promise<
     .select("id, slug, label")
     .order("sort_order");
 
-  if (error || !data) return [];
+  if (error || !data) {
+    if (error) logQueryError("getCategoryOptions", error.message);
+    return [];
+  }
   return data as { id: string; slug: string; label: string }[];
 }
 
@@ -134,7 +153,10 @@ export async function getAllOrders(): Promise<AdminOrder[]> {
     )
     .order("placed_at", { ascending: false });
 
-  if (error || !data) return [];
+  if (error || !data) {
+    if (error) logQueryError("getAllOrders", error.message);
+    return [];
+  }
 
   return (
     data as unknown as {

@@ -24,9 +24,14 @@ export function PendingCartAdd() {
     // Announce after the add has actually landed, not before it: the toast
     // says "Added to cart", and setting state from a promise callback also
     // keeps this effect from re-rendering synchronously.
-    void addItem(pending.product, pending.size, pending.quantity).then(() => {
-      setAdded(`${pending.product.name} (${pending.size})`);
-    });
+    void addItem(pending.product, pending.size, pending.quantity).then(
+      (result) => {
+        // Only announce a replay that actually succeeded. The intent was
+        // already consumed from storage above, so a silent failure here would
+        // lose the item with the customer believing it was added.
+        if (result.ok) setAdded(`${pending.product.name} (${pending.size})`);
+      }
+    );
   }, [user, loading, addItem]);
 
   useEffect(() => {

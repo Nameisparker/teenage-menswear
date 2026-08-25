@@ -14,6 +14,7 @@ export default function CartPage() {
     totalPrice,
     totalListPrice,
     loading,
+    error,
   } = useCart();
 
   // Without this the cart flashes "empty" before the fetch resolves.
@@ -28,7 +29,14 @@ export default function CartPage() {
   if (items.length === 0) {
     return (
       <div className="mx-auto flex max-w-6xl flex-col items-start gap-4 px-4 py-16 sm:px-6">
-        <h1 className="text-2xl font-semibold">Your cart is empty</h1>
+        <h1 className="text-2xl font-semibold">
+          {error ? "We couldn’t load your cart" : "Your cart is empty"}
+        </h1>
+        {error && (
+          <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+            {error}
+          </p>
+        )}
         <Link
           href="/products"
           className="flex h-12 items-center justify-center rounded-full bg-black px-6 font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"
@@ -42,6 +50,15 @@ export default function CartPage() {
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
       <h1 className="mb-8 text-2xl font-semibold">Your cart</h1>
+
+      {error && (
+        <p
+          role="alert"
+          className="mb-6 rounded-md border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300"
+        >
+          {error}
+        </p>
+      )}
 
       <div className="flex flex-col gap-6">
         {items.map((item) => (

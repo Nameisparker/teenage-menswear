@@ -35,7 +35,8 @@ function checkoutError(message: string): string {
 }
 
 export default function CheckoutPage() {
-  const { items, totalPrice, totalListPrice, loading, refresh } = useCart();
+  const { items, totalPrice, totalListPrice, loading, error: cartError, refresh } =
+    useCart();
   const { user } = useAuth();
   const [placed, setPlaced] = useState<PlacedOrder | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -127,7 +128,14 @@ export default function CheckoutPage() {
   if (items.length === 0) {
     return (
       <div className="mx-auto flex max-w-6xl flex-col items-start gap-4 px-4 py-16 sm:px-6">
-        <h1 className="text-2xl font-semibold">Your cart is empty</h1>
+        <h1 className="text-2xl font-semibold">
+          {cartError ? "We couldn’t load your cart" : "Your cart is empty"}
+        </h1>
+        {cartError && (
+          <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+            {cartError}
+          </p>
+        )}
         <Link
           href="/products"
           className="flex h-12 items-center justify-center rounded-full bg-black px-6 font-medium text-white transition-colors hover:bg-zinc-800 dark:bg-white dark:text-black dark:hover:bg-zinc-200"

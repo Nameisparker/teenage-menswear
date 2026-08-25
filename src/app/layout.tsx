@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -8,6 +9,7 @@ import { AuthProvider } from "@/context/auth-context";
 import { AuthModal } from "@/components/auth-modal";
 import { PendingCartAdd } from "@/components/pending-cart-add";
 import { Header } from "@/components/header";
+import { AuthErrorBanner } from "@/components/auth-error-banner";
 import { Footer } from "@/components/footer";
 
 const geistSans = Geist({
@@ -64,6 +66,12 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <AuthProvider>
           <CartProvider>
             <Header categories={categories} storeName={store.name} />
+            {/* Suspense is required, not cosmetic: the banner reads search
+                params, and every prerendered route below would fail to build
+                without a boundary here. */}
+            <Suspense fallback={null}>
+              <AuthErrorBanner />
+            </Suspense>
             <main className="flex-1">{children}</main>
             <Footer />
             <AuthModal />
