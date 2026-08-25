@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 /**
  * Defers the WebGL gallery until it is close to the viewport.
@@ -26,6 +26,22 @@ const CircularGallery = dynamic(
 
 const GALLERY_HEIGHT = 420;
 
+const FALLBACK_FONT = '700 22px "Segoe UI", Arial, Helvetica, sans-serif';
+
+/**
+ * The gallery draws its labels into a canvas, and canvas takes a font string,
+ * not a CSS class — so it cannot inherit the page font. next/font also mangles
+ * the family into a hashed name at build time, so it cannot be hardcoded
+ * either. Reading the variable back off the document gives the real name.
+ */
+function galleryFont() {
+  if (typeof window === "undefined") return FALLBACK_FONT;
+  const family = getComputedStyle(document.documentElement)
+    .getPropertyValue("--font-poppins")
+    .trim();
+  return family ? `700 22px ${family}, "Segoe UI", Arial, sans-serif` : FALLBACK_FONT;
+}
+
 function GalleryPlaceholder() {
   return <div style={{ height: GALLERY_HEIGHT }} aria-hidden="true" />;
 }
@@ -36,6 +52,9 @@ export function CircularGallerySection({
   items: { image: string; text: string }[];
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  // Read once. It is a DOM read with no side effect, and the value cannot
+  // change for the life of the page.
+  const font = useMemo(() => galleryFont(), []);
   const [near, setNear] = useState(false);
 
   useEffect(() => {
@@ -69,7 +88,7 @@ export function CircularGallerySection({
           textColor="#ffffff"
           borderRadius={0.06}
           scrollEase={0.03}
-          font="700 22px Arial, Helvetica, sans-serif"
+          font={font}
         />
       ) : (
         <GalleryPlaceholder />

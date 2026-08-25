@@ -178,9 +178,9 @@ function AuthDialog() {
         {!configured && (
           <p className="mb-4 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-900 dark:text-amber-200">
             Sign-in is not configured. Add{" "}
-            <code className="font-mono">NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
-            <code className="font-mono">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> to{" "}
-            <code className="font-mono">.env.local</code>, then restart the dev
+            <code>NEXT_PUBLIC_SUPABASE_URL</code> and{" "}
+            <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> to{" "}
+            <code>.env.local</code>, then restart the dev
             server.
           </p>
         )}

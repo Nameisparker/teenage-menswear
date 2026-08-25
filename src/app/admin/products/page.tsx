@@ -47,7 +47,7 @@ export default async function AdminProductsPage() {
                     />
                     <div className="flex flex-col">
                       <span className="font-medium">{product.name}</span>
-                      <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400">
+                      <span className="text-xs text-zinc-500 dark:text-zinc-400">
                         {product.slug}
                       </span>
                     </div>

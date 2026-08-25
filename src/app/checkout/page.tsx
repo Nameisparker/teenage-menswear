@@ -101,7 +101,7 @@ export default function CheckoutPage() {
         <h1 className="text-2xl font-semibold">Order placed</h1>
         <p className="text-zinc-600 dark:text-zinc-400">
           Thanks for your order! Your reference is{" "}
-          <span className="font-mono font-medium text-foreground">
+          <span className="font-medium tabular-nums text-foreground">
             {placed.order_number}
           </span>
           {" — "}

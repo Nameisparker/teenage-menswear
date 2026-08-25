@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCart } from "@/context/cart-context";
 import { useAuth } from "@/context/auth-context";
 import { ProfileMenu } from "@/components/profile-menu";
+import { NotificationBell } from "@/components/notification-bell";
 
 /** Categories are fetched by the layout (a Server Component) and passed in,
  * since this component is client-side and cannot query the database itself. */
@@ -16,7 +17,7 @@ export function Header({
   storeName: string;
 }) {
   const { totalItems } = useCart();
-  const { user, loading, openAuth } = useAuth();
+  const { user, loading, isAdmin, openAuth } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
 
   // The wordmark stacks the first word over the rest ("Teenage Menswear" ->
@@ -62,10 +63,15 @@ export function Header({
           ))}
         </nav>
 
-        <div className="flex items-center gap-4 sm:gap-5">
+        <div className="flex items-center gap-3 sm:gap-4">
           {!loading &&
             (user ? (
-              <ProfileMenu />
+              <>
+                {/* Admins only: a shopper has no order feed to be told
+                    about, and the provider opens no socket for them. */}
+                {isAdmin && <NotificationBell />}
+                <ProfileMenu />
+              </>
             ) : (
               <button
                 type="button"

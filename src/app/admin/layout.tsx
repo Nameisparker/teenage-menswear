@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { AdminNav } from "@/components/admin-nav";
 
 /**
  * Server-side gate for every /admin route.
@@ -32,26 +33,7 @@ export default async function AdminLayout({
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
       <div className="mb-8 flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-black/10 pb-4 dark:border-white/10">
         <span className="text-lg font-semibold">Admin</span>
-        <nav className="flex gap-4 text-sm font-medium">
-          <Link
-            href="/admin/products"
-            className="text-zinc-600 transition-colors hover:text-black dark:text-zinc-400 dark:hover:text-white"
-          >
-            Products
-          </Link>
-          <Link
-            href="/admin/orders"
-            className="text-zinc-600 transition-colors hover:text-black dark:text-zinc-400 dark:hover:text-white"
-          >
-            Orders
-          </Link>
-          <Link
-            href="/admin/discounts"
-            className="text-zinc-600 transition-colors hover:text-black dark:text-zinc-400 dark:hover:text-white"
-          >
-            Discounts
-          </Link>
-        </nav>
+        <AdminNav />
         <Link
           href="/admin/products/new"
           className="ml-auto flex h-10 items-center justify-center rounded-full bg-accent px-4 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90"

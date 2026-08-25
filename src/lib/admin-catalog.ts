@@ -130,16 +130,102 @@ export async function getCategoryOptions(): Promise<
   return data as { id: string; slug: string; label: string }[];
 }
 
+export type AdminOrderLine = {
+  name: string;
+  slug: string;
+  size: string;
+  /** What was charged per unit at purchase time, discounts already applied. */
+  unitPrice: number;
+  quantity: number;
+  image: string;
+};
+
+export type AdminOrderEvent = {
+  status: OrderStatus;
+  note: string | null;
+  at: string;
+};
+
 export type AdminOrder = {
   id: string;
   orderNumber: string;
   status: OrderStatus;
+  /** List-price sum. Greater than total when something was discounted. */
+  subtotal: number;
   total: number;
   placedAt: string;
   customerName: string;
   customerPhone: string;
+  customerEmail: string | null;
+  /** Units, not lines — two of one size counts as two. */
   itemCount: number;
+  lines: AdminOrderLine[];
 };
+
+export type AdminOrderDetail = AdminOrder & {
+  shipTo: { line1: string; city: string; pinCode: string };
+  events: AdminOrderEvent[];
+};
+
+/**
+ * Line items are pulled with the order rather than on demand. An order is not
+ * actionable without them: the whole point of the admin list is deciding what
+ * to pack, and a row that only says "3 items" cannot answer that.
+ */
+const ADMIN_ORDER_SELECT = `
+  id, order_number, status, subtotal, total, placed_at,
+  ship_full_name, ship_phone, ship_email, ship_line1, ship_city, ship_pin_code,
+  order_items ( name, slug, size, unit_price, quantity, image_path )
+`;
+
+type AdminOrderRow = {
+  id: string;
+  order_number: string;
+  status: OrderStatus;
+  subtotal: number;
+  total: number;
+  placed_at: string;
+  ship_full_name: string;
+  ship_phone: string;
+  ship_email: string | null;
+  ship_line1: string;
+  ship_city: string;
+  ship_pin_code: string;
+  order_items: {
+    name: string;
+    slug: string;
+    size: string;
+    unit_price: number;
+    quantity: number;
+    image_path: string;
+  }[];
+  order_events?: { status: OrderStatus; note: string | null; created_at: string }[];
+};
+
+function toAdminOrder(row: AdminOrderRow): AdminOrder {
+  const lines = row.order_items.map((item) => ({
+    name: item.name,
+    slug: item.slug,
+    size: item.size,
+    unitPrice: item.unit_price,
+    quantity: item.quantity,
+    image: item.image_path,
+  }));
+
+  return {
+    id: row.id,
+    orderNumber: row.order_number,
+    status: row.status,
+    subtotal: row.subtotal,
+    total: row.total,
+    placedAt: row.placed_at,
+    customerName: row.ship_full_name,
+    customerPhone: row.ship_phone,
+    customerEmail: row.ship_email,
+    itemCount: lines.reduce((sum, line) => sum + line.quantity, 0),
+    lines,
+  };
+}
 
 /** Every order, newest first. Visible only to admins, via RLS. */
 export async function getAllOrders(): Promise<AdminOrder[]> {
@@ -148,9 +234,7 @@ export async function getAllOrders(): Promise<AdminOrder[]> {
 
   const { data, error } = await supabase
     .from("orders")
-    .select(
-      "id, order_number, status, total, placed_at, ship_full_name, ship_phone, order_items ( quantity )"
-    )
+    .select(ADMIN_ORDER_SELECT)
     .order("placed_at", { ascending: false });
 
   if (error || !data) {
@@ -158,25 +242,49 @@ export async function getAllOrders(): Promise<AdminOrder[]> {
     return [];
   }
 
-  return (
-    data as unknown as {
-      id: string;
-      order_number: string;
-      status: OrderStatus;
-      total: number;
-      placed_at: string;
-      ship_full_name: string;
-      ship_phone: string;
-      order_items: { quantity: number }[];
-    }[]
-  ).map((row) => ({
-    id: row.id,
-    orderNumber: row.order_number,
-    status: row.status,
-    total: row.total,
-    placedAt: row.placed_at,
-    customerName: row.ship_full_name,
-    customerPhone: row.ship_phone,
-    itemCount: row.order_items.reduce((sum, item) => sum + item.quantity, 0),
-  }));
+  return (data as unknown as AdminOrderRow[]).map(toAdminOrder);
+}
+
+/**
+ * One order in full, by its human-readable reference. Returns null when it does
+ * not exist — RLS already restricts this to admins, so there is no separate
+ * ownership check to make here.
+ */
+export async function getAdminOrderByNumber(
+  orderNumber: string
+): Promise<AdminOrderDetail | null> {
+  const supabase = await getSupabaseServerClient();
+  if (!supabase) return null;
+
+  const { data, error } = await supabase
+    .from("orders")
+    .select(
+      `${ADMIN_ORDER_SELECT}, order_events ( status, note, created_at )`
+    )
+    .eq("order_number", orderNumber)
+    .maybeSingle();
+
+  if (error || !data) {
+    if (error) logQueryError("getAdminOrderByNumber", error.message);
+    return null;
+  }
+
+  const row = data as unknown as AdminOrderRow;
+
+  return {
+    ...toAdminOrder(row),
+    shipTo: {
+      line1: row.ship_line1,
+      city: row.ship_city,
+      pinCode: row.ship_pin_code,
+    },
+    // Embedded rows come back unordered, so sort explicitly.
+    events: [...(row.order_events ?? [])]
+      .sort((a, b) => a.created_at.localeCompare(b.created_at))
+      .map((event) => ({
+        status: event.status,
+        note: event.note,
+        at: event.created_at,
+      })),
+  };
 }

@@ -31,7 +31,7 @@ export default function Error({
         a moment.
       </p>
       {error.digest && (
-        <p className="font-mono text-xs text-zinc-400">
+        <p className="text-xs text-zinc-400">
           Reference: {error.digest}
         </p>
       )}

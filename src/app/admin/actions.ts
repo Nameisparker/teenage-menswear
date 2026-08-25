@@ -257,7 +257,11 @@ export async function setOrderStatus(
   }
 
   revalidatePath("/admin/orders");
+  // The detail page shows the same status and its own history timeline, so
+  // it goes stale too if only the list is revalidated.
+  revalidatePath("/admin/orders/[orderNumber]", "page");
   revalidatePath("/orders");
+  revalidatePath("/orders/[orderNumber]", "page");
   return { ok: true };
 }
 

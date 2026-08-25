@@ -85,7 +85,7 @@ export function ProductForm({
             name="slug"
             defaultValue={product?.slug}
             placeholder="auto-generated"
-            className={`${inputClass} font-mono`}
+            className={inputClass}
           />
         </Field>
 
@@ -138,7 +138,7 @@ export function ProductForm({
           name="imagePath"
           defaultValue={product?.imagePath}
           placeholder="/products/shirts/shirt_01.jpg"
-          className={`${inputClass} font-mono`}
+          className={inputClass}
         />
       </Field>
 

@@ -40,7 +40,7 @@ export default async function OrdersPage() {
           >
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-3">
-                <span className="font-mono text-sm font-medium">
+                <span className="text-sm font-medium tabular-nums">
                   {order.orderNumber}
                 </span>
                 <StatusBadge status={order.status} />

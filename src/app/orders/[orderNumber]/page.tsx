@@ -42,7 +42,7 @@ export default async function OrderTrackingPage(
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-col gap-2">
-          <h1 className="font-mono text-2xl font-semibold">
+          <h1 className="text-2xl font-semibold tabular-nums">
             {order.orderNumber}
           </h1>
           <p className="text-sm text-zinc-500 dark:text-zinc-400">

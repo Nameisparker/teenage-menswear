@@ -17,7 +17,7 @@ export default async function EditProductPage(
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
         <h1 className="text-xl font-semibold">{product.name}</h1>
-        <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400">
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">
           {product.slug}
         </span>
       </div>
