@@ -82,12 +82,22 @@ export function CircularGallerySection({
   return (
     <div ref={containerRef} style={{ height: GALLERY_HEIGHT, position: "relative" }}>
       {near ? (
+        /* bend={0} is a special case in the engine: it zeroes both the
+            vertical arc and the per-card rotation, so products travel along a
+            flat line rather than riding a curve.
+
+            autoScrollSpeed is added to the scroll target each frame, in the
+            same units as an item's width — ~0.022 at 60fps carries one product
+            past roughly every two seconds. It pauses on hover, while
+            dragging, when the tab is hidden, and is dropped entirely under
+           prefers-reduced-motion. */
         <CircularGallery
           items={items}
-          bend={2}
+          bend={0}
           textColor="#ffffff"
           borderRadius={0.06}
           scrollEase={0.03}
+          autoScrollSpeed={0.022}
           font={font}
         />
       ) : (
