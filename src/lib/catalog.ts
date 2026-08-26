@@ -8,13 +8,15 @@
  * statically renderable; the catalog is world-readable under RLS, so no
  * session is needed to browse.
  */
+import { cache } from "react";
 import { getSupabaseAnonClient } from "./supabase/anon";
 import type {
   CategoryRow,
+  ProductReviewRow,
   ProductWithRelations,
   StoreSettingsRow,
 } from "./supabase/database.types";
-import type { Product } from "./types";
+import type { Product, Review } from "./types";
 
 /**
  * Columns needed to render a product, plus its category slug and sizes.
@@ -77,7 +79,10 @@ function toProduct(row: ProductWithRelations): Product {
   };
 }
 
-export async function getCategories(): Promise<
+// Wrapped in React's cache() because generateMetadata() and the RootLayout
+// component both need this per request — without dedup that's two separate
+// round-trips to Supabase for the same rows on every navigation.
+export const getCategories = cache(async function getCategories(): Promise<
   { value: string; label: string }[]
 > {
   const supabase = client();
@@ -91,7 +96,7 @@ export async function getCategories(): Promise<
   return (data as Pick<CategoryRow, "slug" | "label" | "sort_order">[]).map(
     (row) => ({ value: row.slug, label: row.label })
   );
-}
+});
 
 export async function getProductsByCategory(
   category?: string
@@ -146,7 +151,9 @@ export async function getProductSlugs(): Promise<string[]> {
   return (data as { slug: string }[]).map((row) => row.slug);
 }
 
-export async function getStoreSettings(): Promise<StoreSettingsRow> {
+// See getCategories() above for why this is cached: generateMetadata() and
+// RootLayout both call it on every request.
+export const getStoreSettings = cache(async function getStoreSettings(): Promise<StoreSettingsRow> {
   const supabase = client();
   const { data, error } = await supabase
     .from("store_settings")
@@ -155,4 +162,27 @@ export async function getStoreSettings(): Promise<StoreSettingsRow> {
 
   if (error) throw new CatalogUnavailableError(error.message);
   return data as StoreSettingsRow;
+});
+
+/** Newest first, like Amazon/Flipkart — reviewers want to see recent opinions. */
+export async function getProductReviews(productId: string): Promise<Review[]> {
+  const supabase = client();
+  const { data, error } = await supabase
+    .from("product_reviews")
+    .select("id, product_id, user_id, reviewer_name, rating, comment, created_at, updated_at")
+    .eq("product_id", productId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new CatalogUnavailableError(error.message);
+
+  return (data as ProductReviewRow[]).map((row) => ({
+    id: row.id,
+    productId: row.product_id,
+    userId: row.user_id,
+    reviewerName: row.reviewer_name,
+    rating: row.rating,
+    comment: row.comment,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  }));
 }

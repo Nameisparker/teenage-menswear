@@ -30,6 +30,10 @@ The schema lives in `supabase/migrations/`, applied in filename order:
 | `20260824000003_cart_and_order_functions.sql` | `add_to_cart` and `place_order` |
 | `20260824000004_lock_down_trigger_functions.sql` | Removes trigger functions from the REST API |
 | `20260824000005_roles_and_order_tracking.sql` | Roles, admin policies, `order_events` |
+| `20260825000000_product_discounts.sql` | `discount_percent` / `offer_price` on products |
+| `20260825010000_rls_performance.sql` | RLS policy performance, no access changes |
+| `20260825020000_orders_realtime.sql` | Realtime for order status |
+| `20260826000000_product_reviews.sql` | `product_reviews` — star rating + comment |
 
 ### Tables
 
@@ -45,6 +49,7 @@ The schema lives in `supabase/migrations/`, applied in filename order:
 | `orders` | Placed orders, shipping details snapshotted | Insert + read own; no update |
 | `order_items` | Line items, name/price snapshotted at purchase | Insert + read own; admins read all |
 | `order_events` | One row per status change — the tracking timeline | Read own (or all, for admins); written only by trigger |
+| `product_reviews` | Star rating + comment, one per customer per product | Public read; write/edit/delete own, admins delete any |
 
 Design notes worth knowing before you extend it:
 

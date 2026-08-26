@@ -11,10 +11,19 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
  * outgoing response here — without this, Server Components would read stale
  * cookies and users would get logged out at random.
  */
+const GATED = ["/admin", "/orders"];
+
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) return response;
+
+  // Only routes that actually gate on auth need the round-trip to Supabase's
+  // Auth API — running it on every public page (product pages, home, etc.)
+  // was adding a full network request to every navigation for nothing.
+  if (!GATED.some((path) => request.nextUrl.pathname.startsWith(path))) {
+    return response;
+  }
 
   const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     cookies: {
@@ -47,8 +56,7 @@ export async function proxy(request: NextRequest) {
   // Server Function is a POST to the page it lives on, so a matcher change
   // could silently drop coverage. /admin is authorised in its layout and,
   // finally, by RLS — see app/admin/layout.tsx.
-  const gated = ["/admin", "/orders"];
-  if (!user && gated.some((path) => request.nextUrl.pathname.startsWith(path))) {
+  if (!user) {
     const home = new URL("/", request.url);
     home.searchParams.set("auth_error", "Sign in to continue");
     return NextResponse.redirect(home);

@@ -21,6 +21,17 @@ export type Product = {
   featured?: boolean;
 };
 
+export type Review = {
+  id: string;
+  productId: string;
+  userId: string;
+  reviewerName: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type CartItem = {
   productId: string;
   slug: string;
