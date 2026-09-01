@@ -10,10 +10,19 @@ import { Price } from "@/components/price";
 import { digitsOnly } from "@/lib/phone";
 import { usePinCity } from "@/lib/use-pin-city";
 import { PinHint } from "@/components/pin-hint";
-import type { AddressRow } from "@/lib/supabase/database.types";
+import {
+  loadRazorpayCheckout,
+  openRazorpayCheckout,
+  type RazorpaySession,
+} from "@/lib/payment";
+import type {
+  AddressRow,
+  PaymentMethod,
+} from "@/lib/supabase/database.types";
 
-/** What place_order returns — enough to confirm the order to the customer. */
+/** What place_order returns — enough to drive the payment and confirm it. */
 type PlacedOrder = {
+  id: string;
   order_number: string;
   total: number;
 };
@@ -46,6 +55,10 @@ export default function CheckoutPage() {
   const [placed, setPlaced] = useState<PlacedOrder | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [method, setMethod] = useState<PaymentMethod>("cod");
+  // Set when a prepaid order exists but the payment did not go through, so the
+  // customer is told their order was kept rather than silently losing it.
+  const [unpaidOrder, setUnpaidOrder] = useState<PlacedOrder | null>(null);
 
   // PIN and city are controlled so the lookup can fill the city in. City
   // stays editable either way — the postal district is not always what
@@ -117,6 +130,7 @@ export default function CheckoutPage() {
     const form = new FormData(event.currentTarget);
     setSubmitting(true);
     setError(null);
+    setUnpaidOrder(null);
 
     // Totals are deliberately NOT sent. place_order recomputes them from the
     // products table, so the browser cannot dictate what an order costs.
@@ -128,6 +142,7 @@ export default function CheckoutPage() {
         p_line1: String(form.get("address") ?? ""),
         p_city: String(form.get("city") ?? ""),
         p_pin_code: String(form.get("pinCode") ?? ""),
+        p_payment_method: method,
       })
       .single();
 
@@ -142,10 +157,85 @@ export default function CheckoutPage() {
     }
 
     const order = data as PlacedOrder;
-    setPlaced(order);
-    // place_order clears the cart server-side; sync local state to match.
-    await refresh();
-    setSubmitting(false);
+
+    if (method === "cod") {
+      setPlaced(order);
+      // place_order clears the cart server-side; sync local state to match.
+      await refresh();
+      setSubmitting(false);
+      return;
+    }
+
+    await payForOrder(order);
+  }
+
+  /**
+   * Takes a freshly placed prepaid order through Razorpay.
+   *
+   * The order already exists and is unpaid; nothing here can change what it
+   * costs. Every exit that is not a verified payment leaves it that way, and
+   * says so, rather than pretending the order failed — it is in the database
+   * either way.
+   */
+  async function payForOrder(order: PlacedOrder) {
+    const supabase = getSupabaseBrowserClient();
+    if (!supabase) return;
+
+    try {
+      const [{ data: session, error: sessionError }] = await Promise.all([
+        supabase.functions.invoke<RazorpaySession>("razorpay-create-order", {
+          body: { orderId: order.id },
+        }),
+        // Fetched alongside, not after: the widget script and the Razorpay
+        // order have nothing to do with each other.
+        loadRazorpayCheckout(),
+      ]);
+
+      if (sessionError || !session) throw sessionError ?? new Error("No session");
+
+      const result = await openRazorpayCheckout(session, "Teenage Menswear");
+
+      if (result.dismissed) {
+        setUnpaidOrder(order);
+        setSubmitting(false);
+        return;
+      }
+
+      // The signature is checked in the Edge Function against the key secret.
+      // A "success" the browser made up gets rejected there.
+      const { data: verified, error: verifyError } =
+        await supabase.functions.invoke<{ ok: boolean }>("razorpay-verify", {
+          body: {
+            razorpayOrderId: result.response.razorpay_order_id,
+            razorpayPaymentId: result.response.razorpay_payment_id,
+            signature: result.response.razorpay_signature,
+          },
+        });
+
+      if (verifyError || !verified?.ok) {
+        // The money may well have left their account — the webhook will settle
+        // it. Never tell them the payment failed when we simply cannot confirm
+        // it from here.
+        console.error("razorpay verify failed", verifyError);
+        setError(
+          "We could not confirm your payment from here. If it was debited, your order will update shortly — check My orders."
+        );
+        setUnpaidOrder(order);
+        setSubmitting(false);
+        return;
+      }
+
+      setPlaced(order);
+      await refresh();
+      setSubmitting(false);
+    } catch (paymentError) {
+      console.error("razorpay payment failed", paymentError);
+      setError(
+        "We couldn’t start the online payment. Your order is saved — retry the payment, or place it as cash on delivery."
+      );
+      setUnpaidOrder(order);
+      setSubmitting(false);
+    }
   }
 
   if (placed) {
@@ -158,7 +248,10 @@ export default function CheckoutPage() {
             {placed.order_number}
           </span>
           {" — "}
-          {formatPrice(placed.total)}. We&apos;ll call to confirm delivery.
+          {formatPrice(placed.total)}
+          {method === "razorpay"
+            ? ", paid online. We’ll call to confirm delivery."
+            : ", payable on delivery. We’ll call to confirm."}
         </p>
         <Link
           href="/products"
@@ -292,10 +385,48 @@ export default function CheckoutPage() {
 
         <PinHint state={pinState} />
 
+        <fieldset className="mt-2 flex flex-col gap-3">
+          <legend className="mb-2 text-sm font-semibold">How to pay</legend>
+
+          <PaymentChoice
+            checked={method === "cod"}
+            onChange={() => setMethod("cod")}
+            title="Cash on delivery"
+            detail="Pay the courier when it arrives."
+          />
+          <PaymentChoice
+            checked={method === "razorpay"}
+            onChange={() => setMethod("razorpay")}
+            title="Pay online"
+            detail="UPI, card, or netbanking via Razorpay."
+          />
+        </fieldset>
+
         {error && (
           <p role="alert" className="text-sm text-red-600 dark:text-red-400">
             {error}
           </p>
+        )}
+
+        {/* The order exists and is unpaid. Offering the payment again beats
+            making them re-enter an address to create a duplicate order. */}
+        {unpaidOrder && !submitting && (
+          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
+            <p className="font-medium text-amber-900 dark:text-amber-200">
+              Order {unpaidOrder.order_number} is saved but not paid.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setSubmitting(true);
+                setError(null);
+                void payForOrder(unpaidOrder);
+              }}
+              className="mt-2 font-medium text-accent underline-offset-2 hover:underline"
+            >
+              Try the payment again
+            </button>
+          </div>
         )}
 
         <button
@@ -304,12 +435,13 @@ export default function CheckoutPage() {
           className="mt-2 flex h-12 w-full items-center justify-center rounded-full bg-accent px-6 font-medium text-accent-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
         >
           {submitting
-            ? "Placing order…"
-            : `Place order — ${formatPrice(totalPrice)}`}
+            ? method === "razorpay"
+              ? "Opening payment…"
+              : "Placing order…"
+            : method === "razorpay"
+              ? `Pay ${formatPrice(totalPrice)}`
+              : `Place order — ${formatPrice(totalPrice)}`}
         </button>
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          Demo checkout — no real payment will be processed.
-        </p>
       </form>
 
       {/* The bill. Sticks alongside a long form on desktop so the total stays
@@ -386,5 +518,42 @@ export default function CheckoutPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+/** One payment option: a radio, styled as a selectable card. */
+function PaymentChoice({
+  checked,
+  onChange,
+  title,
+  detail,
+}: {
+  checked: boolean;
+  onChange: () => void;
+  title: string;
+  detail: string;
+}) {
+  return (
+    <label
+      className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors ${
+        checked
+          ? "border-accent bg-accent/5"
+          : "border-black/15 hover:border-black/40 dark:border-white/20 dark:hover:border-white/50"
+      }`}
+    >
+      <input
+        type="radio"
+        name="paymentMethod"
+        checked={checked}
+        onChange={onChange}
+        className="mt-0.5 h-4 w-4 accent-accent"
+      />
+      <span className="flex flex-col gap-0.5">
+        <span className="text-sm font-medium">{title}</span>
+        <span className="text-xs text-zinc-500 dark:text-zinc-400">
+          {detail}
+        </span>
+      </span>
+    </label>
   );
 }

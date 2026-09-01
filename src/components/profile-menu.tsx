@@ -15,7 +15,7 @@ import {
  * server by the admin layout and, underneath that, by RLS.
  */
 export function ProfileMenu() {
-  const { user, isAdmin, signOut } = useAuth();
+  const { user, isAdmin, profileName, signOut } = useAuth();
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -41,7 +41,7 @@ export function ProfileMenu() {
 
   if (!user) return null;
 
-  const name = displayNameFor(user);
+  const name = displayNameFor(user, profileName);
   const avatarUrl = avatarUrlFor(user);
   // Only worth a second line when it says something the name does not.
   const contact = user.email ?? user.phone ?? null;
@@ -69,7 +69,7 @@ export function ProfileMenu() {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
         ) : (
-          initialsFor(user)
+          initialsFor(user, profileName)
         )}
       </button>
 

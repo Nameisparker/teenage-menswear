@@ -6,7 +6,11 @@
  * only works when the request carries the admin's session.
  */
 import { getSupabaseServerClient } from "./supabase/server";
-import type { OrderStatus } from "./supabase/database.types";
+import type {
+  OrderStatus,
+  PaymentMethod,
+  PaymentStatus,
+} from "./supabase/database.types";
 
 /**
  * A failed query and an empty table are not the same thing, and returning [] for
@@ -150,6 +154,8 @@ export type AdminOrder = {
   id: string;
   orderNumber: string;
   status: OrderStatus;
+  paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
   /** List-price sum. Greater than total when something was discounted. */
   subtotal: number;
   total: number;
@@ -174,6 +180,7 @@ export type AdminOrderDetail = AdminOrder & {
  */
 const ADMIN_ORDER_SELECT = `
   id, order_number, status, subtotal, total, placed_at,
+  payment_method, payment_status,
   ship_full_name, ship_phone, ship_email, ship_line1, ship_city, ship_pin_code,
   order_items ( name, slug, size, unit_price, quantity, image_path )
 `;
@@ -182,6 +189,8 @@ type AdminOrderRow = {
   id: string;
   order_number: string;
   status: OrderStatus;
+  payment_method: PaymentMethod;
+  payment_status: PaymentStatus;
   subtotal: number;
   total: number;
   placed_at: string;
@@ -216,6 +225,8 @@ function toAdminOrder(row: AdminOrderRow): AdminOrder {
     id: row.id,
     orderNumber: row.order_number,
     status: row.status,
+    paymentMethod: row.payment_method,
+    paymentStatus: row.payment_status,
     subtotal: row.subtotal,
     total: row.total,
     placedAt: row.placed_at,

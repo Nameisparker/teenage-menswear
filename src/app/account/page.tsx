@@ -27,7 +27,7 @@ const inputClass =
 type Status = { kind: "idle" | "saving" } | { kind: "saved" | "error"; message: string };
 
 export default function AccountPage() {
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, refreshProfile } = useAuth();
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -175,6 +175,11 @@ export default function AccountPage() {
       });
       return;
     }
+
+    // The name in the header comes from this row, so pull it again now rather
+    // than waiting for a reload. Done before the address save so the header is
+    // still correct on the "details saved, address was not" path below.
+    refreshProfile();
 
     if (addressComplete) {
       const row = {
