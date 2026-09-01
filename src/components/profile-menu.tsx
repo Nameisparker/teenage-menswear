@@ -101,6 +101,14 @@ export function ProfileMenu() {
           <div className="my-1 border-t border-black/10 dark:border-white/10" />
 
           <Link
+            href="/account"
+            role="menuitem"
+            onClick={() => setOpen(false)}
+            className={itemClass}
+          >
+            Edit profile
+          </Link>
+          <Link
             href="/orders"
             role="menuitem"
             onClick={() => setOpen(false)}

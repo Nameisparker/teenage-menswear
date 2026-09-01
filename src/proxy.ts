@@ -11,7 +11,7 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
  * outgoing response here — without this, Server Components would read stale
  * cookies and users would get logged out at random.
  */
-const GATED = ["/admin", "/orders"];
+const GATED = ["/admin", "/orders", "/account"];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });

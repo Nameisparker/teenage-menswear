@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useCart } from "@/context/cart-context";
 import { useAuth } from "@/context/auth-context";
@@ -8,6 +8,9 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { formatPrice } from "@/lib/format";
 import { Price } from "@/components/price";
 import { digitsOnly } from "@/lib/phone";
+import { usePinCity } from "@/lib/use-pin-city";
+import { PinHint } from "@/components/pin-hint";
+import type { AddressRow } from "@/lib/supabase/database.types";
 
 /** What place_order returns — enough to confirm the order to the customer. */
 type PlacedOrder = {
@@ -37,18 +40,68 @@ function checkoutError(message: string): string {
 export default function CheckoutPage() {
   const { items, totalPrice, totalListPrice, loading, error: cartError, refresh } =
     useCart();
+  const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+  const savings = totalListPrice - totalPrice;
   const { user } = useAuth();
   const [placed, setPlaced] = useState<PlacedOrder | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // PIN and city are controlled so the lookup can fill the city in. City
+  // stays editable either way — the postal district is not always what
+  // someone calls the place they live.
+  const { pinCode, city, setCity, pinState, handlePinChange, seed } =
+    usePinCity();
+
+  // The address saved on /account, when there is one. Filling it in here is
+  // the whole point of storing it.
+  const [saved, setSaved] = useState<AddressRow | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      const supabase = getSupabaseBrowserClient();
+      if (!user || !supabase) return;
+
+      const { data } = await supabase
+        .from("addresses")
+        .select("id, user_id, full_name, phone, line1, city, pin_code, is_default")
+        .eq("user_id", user.id)
+        .order("is_default", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (cancelled || !data) return;
+      const address = data as AddressRow;
+      setSaved(address);
+      // seed() rather than handlePinChange(): the city is already known, so
+      // there is nothing to look up.
+      seed(address.pin_code, address.city);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // seed is stable for the life of the hook.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
   // Items can only reach the cart while signed in, so prefill what we know
   // rather than making the user retype it.
   const meta = user?.user_metadata ?? {};
   const prefill = {
-    name: ((meta.full_name ?? meta.name) as string | undefined) ?? "",
+    name:
+      saved?.full_name ??
+      ((meta.full_name ?? meta.name) as string | undefined) ??
+      "",
     email: user?.email ?? "",
-    phone: user?.phone ? digitsOnly(user.phone).slice(-10) : "",
+    phone: saved?.phone
+      ? digitsOnly(saved.phone).slice(-10)
+      : user?.phone
+        ? digitsOnly(user.phone).slice(-10)
+        : "",
+    address: saved?.line1 ?? "",
   };
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -148,9 +201,10 @@ export default function CheckoutPage() {
 
   return (
     <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 sm:grid-cols-2">
-      {/* Remount when the session resolves so the prefilled defaults apply. */}
+      {/* Remount when the session — or the saved address — resolves, so the
+          prefilled defaults apply. */}
       <form
-        key={user?.id ?? "anonymous"}
+        key={`${user?.id ?? "anonymous"}-${saved?.id ?? "no-address"}`}
         onSubmit={handleSubmit}
         className="flex flex-col gap-4"
       >
@@ -197,32 +251,46 @@ export default function CheckoutPage() {
             required
             name="address"
             rows={3}
+            defaultValue={prefill.address}
             className="rounded-md border border-black/15 px-3 py-2 text-sm dark:border-white/20 dark:bg-transparent"
           />
         </label>
 
         <div className="grid grid-cols-2 gap-4">
-          <label className="flex flex-col gap-1 text-sm font-medium">
-            City
-            <input
-              required
-              name="city"
-              type="text"
-              className="rounded-md border border-black/15 px-3 py-2 text-sm dark:border-white/20 dark:bg-transparent"
-            />
-          </label>
+          {/* PIN first: it fills the city in, so asking for it second would
+              have people type a city that is about to be overwritten. */}
           <label className="flex flex-col gap-1 text-sm font-medium">
             PIN code
             <input
               required
               name="pinCode"
               type="text"
+              inputMode="numeric"
               pattern="[0-9]{6}"
+              maxLength={6}
               placeholder="6-digit PIN"
+              value={pinCode}
+              onChange={(event) => handlePinChange(event.target.value)}
+              className="rounded-md border border-black/15 px-3 py-2 text-sm dark:border-white/20 dark:bg-transparent"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-medium">
+            City
+            <input
+              required
+              name="city"
+              type="text"
+              value={city}
+              onChange={(event) => setCity(event.target.value)}
+              placeholder={
+                pinState.status === "loading" ? "Looking up…" : undefined
+              }
               className="rounded-md border border-black/15 px-3 py-2 text-sm dark:border-white/20 dark:bg-transparent"
             />
           </label>
         </div>
+
+        <PinHint state={pinState} />
 
         {error && (
           <p role="alert" className="text-sm text-red-600 dark:text-red-400">
@@ -244,44 +312,78 @@ export default function CheckoutPage() {
         </p>
       </form>
 
-      <div className="flex flex-col gap-4">
-        <h2 className="text-lg font-semibold">Order summary</h2>
+      {/* The bill. Sticks alongside a long form on desktop so the total stays
+          in view while the address is filled in. */}
+      <div className="flex flex-col gap-4 rounded-xl border border-black/10 p-5 sm:sticky sm:top-6 sm:self-start dark:border-white/10">
+        <h2 className="text-lg font-semibold">
+          Order summary{" "}
+          <span className="font-normal text-zinc-500 dark:text-zinc-400">
+            ({totalItems} item{totalItems === 1 ? "" : "s"})
+          </span>
+        </h2>
+
         <div className="flex flex-col gap-3">
           {items.map((item) => (
             <div
               key={`${item.slug}-${item.size}`}
-              className="flex justify-between text-sm"
+              className="flex justify-between gap-4 text-sm"
             >
               <span>
-                {item.name} ({item.size}) &times; {item.quantity}
+                {item.name}
+                <span className="text-zinc-500 dark:text-zinc-400">
+                  {" "}
+                  · {item.size} &times; {item.quantity}
+                </span>
               </span>
               <Price
                 price={item.price}
                 offerPrice={item.offerPrice}
                 discountPercent={item.discountPercent}
                 quantity={item.quantity}
+                className="shrink-0"
               />
             </div>
           ))}
         </div>
-        <div className="flex flex-col gap-1 border-t border-black/10 pt-4 dark:border-white/10">
-          {totalListPrice > totalPrice && (
-            <>
-              <div className="flex justify-between text-sm text-zinc-500 dark:text-zinc-400">
-                <span>Subtotal</span>
-                <span>{formatPrice(totalListPrice)}</span>
-              </div>
-              <div className="flex justify-between text-sm font-medium text-accent">
-                <span>Discount</span>
-                <span>−{formatPrice(totalListPrice - totalPrice)}</span>
-              </div>
-            </>
-          )}
-          <div className="flex justify-between text-lg font-semibold">
-            <span>Total</span>
-            <span>{formatPrice(totalPrice)}</span>
+
+        <dl className="flex flex-col gap-2 border-t border-black/10 pt-4 text-sm dark:border-white/10">
+          <div className="flex justify-between">
+            <dt className="text-zinc-500 dark:text-zinc-400">
+              Price ({totalItems} item{totalItems === 1 ? "" : "s"})
+            </dt>
+            <dd>{formatPrice(totalListPrice)}</dd>
           </div>
+
+          {savings > 0 && (
+            <div className="flex justify-between font-medium text-accent">
+              <dt>Discount</dt>
+              <dd>−{formatPrice(savings)}</dd>
+            </div>
+          )}
+
+          {/* Free on every order, and charged that way by place_order too —
+              a delivery fee shown here that the RPC does not add would bill
+              the customer a different number than the one they agreed to. */}
+          <div className="flex justify-between">
+            <dt className="text-zinc-500 dark:text-zinc-400">Delivery</dt>
+            <dd className="font-medium text-accent">Free</dd>
+          </div>
+        </dl>
+
+        <div className="flex justify-between border-t border-black/10 pt-4 text-lg font-semibold dark:border-white/10">
+          <span>Total payable</span>
+          <span>{formatPrice(totalPrice)}</span>
         </div>
+
+        {savings > 0 && (
+          <p className="rounded-md bg-accent/10 px-3 py-2 text-sm font-medium text-accent">
+            You save {formatPrice(savings)} on this order.
+          </p>
+        )}
+
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          Prices include all taxes.
+        </p>
       </div>
     </div>
   );
