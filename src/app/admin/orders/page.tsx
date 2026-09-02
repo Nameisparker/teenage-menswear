@@ -3,6 +3,7 @@ import { getAllOrders } from "@/lib/admin-catalog";
 import { formatPrice } from "@/lib/format";
 import { ProductImage } from "@/components/product-image";
 import { OrderStatusControl } from "@/components/order-status-control";
+import { PaymentBadge } from "@/components/payment-badge";
 
 export const metadata = { title: "Admin — Orders" };
 
@@ -78,10 +79,16 @@ export default async function AdminOrdersPage() {
                       {order.itemCount === 1 ? "unit" : "units"}
                     </span>
                   </div>
-                  <OrderStatusControl
-                    orderId={order.id}
-                    status={order.status}
-                  />
+                  <div className="flex flex-col items-end gap-2">
+                    <OrderStatusControl
+                      orderId={order.id}
+                      status={order.status}
+                    />
+                    <PaymentBadge
+                      method={order.paymentMethod}
+                      status={order.paymentStatus}
+                    />
+                  </div>
                 </div>
               </div>
 

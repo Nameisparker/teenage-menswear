@@ -87,8 +87,8 @@ export function CircularGallerySection({
             flat line rather than riding a curve.
 
             autoScrollSpeed is added to the scroll target each frame, in the
-            same units as an item's width — ~0.022 at 60fps carries one product
-            past roughly every two seconds. It pauses on hover, while
+            same units as an item's width — ~0.03 at 60fps carries one product
+            past roughly every second and a half. It pauses on hover, while
             dragging, when the tab is hidden, and is dropped entirely under
            prefers-reduced-motion. */
         <CircularGallery
@@ -97,7 +97,7 @@ export function CircularGallerySection({
           textColor="#ffffff"
           borderRadius={0.06}
           scrollEase={0.03}
-          autoScrollSpeed={0.022}
+          autoScrollSpeed={0.05}
           font={font}
         />
       ) : (

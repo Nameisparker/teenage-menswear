@@ -249,6 +249,63 @@ fixes it, and exits non-zero while anything is missing.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Payments (Razorpay + cash on delivery)
+
+Checkout offers two methods. COD is the default and needs no configuration.
+Online payment goes through Razorpay and needs the setup below.
+
+Two columns carry it: `orders.payment_method` (`cod` / `razorpay`) and
+`orders.payment_status` (`unpaid` / `paid` / `failed` / `refunded`). They are
+separate from `status`, which is fulfilment — a COD order ships while still
+unpaid, and folding the two axes into one enum makes that unrepresentable.
+
+### How a prepaid order flows
+
+1. `place_order(..., p_payment_method => 'razorpay')` writes the order as
+   `unpaid` and **leaves the cart alone**, so an abandoned payment does not
+   lose it. For COD it clears the cart exactly as before.
+2. `razorpay-create-order` (Edge Function) reads `orders.total` — computed in
+   Postgres, never sent by the browser — creates the Razorpay order, and
+   returns the public key id and order id.
+3. Razorpay's widget opens in the browser.
+4. `razorpay-verify` recomputes the HMAC of `<order_id>|<payment_id>` with the
+   key secret. Only a match flips the order to `paid` and clears the cart.
+5. `razorpay-webhook` does the same job from Razorpay's side, for a customer
+   whose tab closed mid-payment. Both are idempotent; whichever lands first wins.
+
+The browser never sees the key secret and cannot mark anything paid. The
+column grants in `20260901000000_razorpay_payments.sql` are what enforce that:
+`authenticated` may insert `payment_method` but not `payment_status`, so a
+hand-rolled POST to `/rest/v1/orders` cannot claim to have paid.
+
+### Setting it up
+
+1. Create a Razorpay account and take the **Key ID** and **Key Secret** from
+   Dashboard → Settings → API Keys. Test-mode keys are enough to develop with.
+2. Set the function secrets (they are never exposed to the browser):
+
+```bash
+supabase secrets set RAZORPAY_KEY_ID=rzp_test_xxx
+supabase secrets set RAZORPAY_KEY_SECRET=xxx
+supabase secrets set RAZORPAY_WEBHOOK_SECRET=xxx
+```
+
+3. Deploy the functions. The webhook must skip JWT verification — Razorpay
+   carries no Supabase session, and its own signature is the authentication:
+
+```bash
+supabase functions deploy razorpay-create-order
+supabase functions deploy razorpay-verify
+supabase functions deploy razorpay-webhook --no-verify-jwt
+```
+
+4. In Razorpay → Settings → Webhooks, add
+   `https://<project-ref>.supabase.co/functions/v1/razorpay-webhook` with the
+   secret from step 2, subscribed to `payment.captured` and `payment.failed`.
+
+Without step 4 payments still work — verification happens in the browser round
+trip — but a customer who closes the tab mid-payment leaves a paid payment
+against an unpaid order until someone reconciles it by hand.
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

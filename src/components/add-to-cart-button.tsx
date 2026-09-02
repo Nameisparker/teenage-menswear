@@ -1,20 +1,30 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useCart } from "@/context/cart-context";
 import { useAuth } from "@/context/auth-context";
 import { savePendingCartAdd } from "@/lib/pending-cart";
+import { SizeChart } from "./size-chart";
 import type { Product } from "@/lib/types";
 
 export function AddToCartButton({ product }: { product: Product }) {
-  const { addItem } = useCart();
+  const { addItem, items } = useCart();
   const { user, loading, openAuth } = useAuth();
+  const router = useRouter();
   // A product with no variants left would otherwise send size=undefined to a
   // NOT NULL column. Empty string keeps the guard in addItem meaningful.
   const [size, setSize] = useState(product.sizes[0] ?? "");
   const [added, setAdded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // Read from the cart itself rather than a local "was clicked" flag, so
+  // "Buy now" is still there after a reload, and disappears again when the
+  // shopper switches to a size they have not added.
+  const inCart = items.some(
+    (item) => item.productId === product.id && item.size === size
+  );
 
   // One timer, cleared on unmount and restarted by each success — without
   // this, rapid clicks stack timeouts that race to clear the confirmation.
@@ -50,7 +60,7 @@ export function AddToCartButton({ product }: { product: Product }) {
   return (
     <div className="flex flex-col gap-4">
       {product.sizes.length > 1 && (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
           <span className="text-sm font-medium">Size</span>
           <div className="flex flex-wrap gap-2">
             {product.sizes.map((s) => (
@@ -68,17 +78,47 @@ export function AddToCartButton({ product }: { product: Product }) {
               </button>
             ))}
           </div>
+          {/* Below the chips rather than beside the label: the expanded table
+              needs the full column width. */}
+          <SizeChart sizes={product.sizes} />
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={() => void handleAdd()}
-        disabled={loading || busy || product.sizes.length === 0}
-        className="flex h-12 w-full items-center justify-center rounded-full bg-accent px-5 font-medium text-accent-foreground transition-opacity hover:opacity-90 disabled:opacity-60"
-      >
-        {busy ? "Adding…" : added ? "Added to cart" : "Add to cart"}
-      </button>
+      <div className="flex flex-col gap-3">
+        <button
+          type="button"
+          onClick={() => void handleAdd()}
+          disabled={loading || busy || product.sizes.length === 0}
+          // Green for as long as the size is in the cart, so the state is
+          // still readable after a scroll or a reload — not just for the
+          // second or two after the click.
+          className={`flex h-12 w-full items-center justify-center rounded-full px-5 font-medium transition-colors disabled:opacity-60 ${
+            inCart
+              ? "bg-emerald-600 text-white hover:bg-emerald-700"
+              : "bg-accent text-accent-foreground hover:opacity-90"
+          }`}
+        >
+          {busy
+            ? "Adding…"
+            : added
+              ? "✓ Added to cart"
+              : inCart
+                ? "✓ In cart"
+                : "Add to cart"}
+        </button>
+
+        {/* Appears only once this size is actually in the cart, so it can
+            never send someone to an empty checkout. */}
+        {inCart && (
+          <button
+            type="button"
+            onClick={() => router.push("/checkout")}
+            className="flex h-12 w-full items-center justify-center rounded-full border border-black bg-transparent px-5 font-medium transition-colors hover:bg-black hover:text-white dark:border-white dark:hover:bg-white dark:hover:text-black"
+          >
+            Buy now
+          </button>
+        )}
+      </div>
 
       {error && (
         <p role="alert" className="text-center text-sm text-red-600 dark:text-red-400">

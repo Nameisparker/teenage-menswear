@@ -238,6 +238,42 @@ export async function setProductActive(
   return { ok: true };
 }
 
+
+/**
+ * Adds or removes a product from the featured list.
+ *
+ * Also settable on the product form, but curating the home page one product at
+ * a time through a form is not curating — the featured screen needs to flip the
+ * flag in place.
+ */
+export async function setProductFeatured(
+  productId: string,
+  featured: boolean
+): Promise<ActionResult> {
+  const { supabase, error: adminError } = await requireAdmin();
+  if (!supabase) return { ok: false, error: adminError ?? "Unauthorised." };
+
+  const { error } = await supabase
+    .from("products")
+    .update({ featured })
+    .eq("id", productId);
+
+  if (error) {
+    return failed(
+      "setProductFeatured",
+      error.message,
+      "Could not update the featured list."
+    );
+  }
+
+  // The home page's featured block reads this flag, and so does the default
+  // "Featured" sort on /products.
+  revalidatePath("/");
+  revalidatePath("/products");
+  revalidatePath("/admin/products");
+  revalidatePath("/admin/featured");
+  return { ok: true };
+}
 export async function setOrderStatus(
   orderId: string,
   status: OrderStatus

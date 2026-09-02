@@ -9,7 +9,11 @@
  */
 import "server-only";
 import { getSupabaseServerClient } from "./supabase/server";
-import type { OrderStatus } from "./supabase/database.types";
+import type {
+  OrderStatus,
+  PaymentMethod,
+  PaymentStatus,
+} from "./supabase/database.types";
 
 export type OrderLine = {
   name: string;
@@ -32,6 +36,8 @@ export type Order = {
   status: OrderStatus;
   total: number;
   placedAt: string;
+  paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
   shipTo: {
     fullName: string;
     phone: string;
@@ -44,7 +50,7 @@ export type Order = {
 };
 
 const ORDER_SELECT = `
-  id, order_number, status, total, placed_at,
+  id, order_number, status, total, placed_at, payment_method, payment_status,
   ship_full_name, ship_phone, ship_line1, ship_city, ship_pin_code,
   order_items ( name, slug, size, unit_price, quantity, image_path ),
   order_events ( status, note, created_at )
@@ -56,6 +62,8 @@ type OrderRowWithRelations = {
   status: OrderStatus;
   total: number;
   placed_at: string;
+  payment_method: PaymentMethod;
+  payment_status: PaymentStatus;
   ship_full_name: string;
   ship_phone: string;
   ship_line1: string;
@@ -79,6 +87,8 @@ function toOrder(row: OrderRowWithRelations): Order {
     status: row.status,
     total: row.total,
     placedAt: row.placed_at,
+    paymentMethod: row.payment_method,
+    paymentStatus: row.payment_status,
     shipTo: {
       fullName: row.ship_full_name,
       phone: row.ship_phone,

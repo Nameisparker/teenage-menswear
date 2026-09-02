@@ -17,6 +17,12 @@ export type OrderStatus =
   | "delivered"
   | "cancelled";
 
+/** How an order is paid for. COD is the default and the historical behaviour. */
+export type PaymentMethod = "cod" | "razorpay";
+
+/** Money, not fulfilment — an order can be shipped and still unpaid (COD). */
+export type PaymentStatus = "unpaid" | "paid" | "failed" | "refunded";
+
 export type CategoryRow = {
   id: string;
   slug: string;
@@ -101,6 +107,11 @@ export type OrderRow = {
   subtotal: number;
   total: number;
   placed_at: string;
+  payment_method: PaymentMethod;
+  payment_status: PaymentStatus;
+  razorpay_order_id: string | null;
+  razorpay_payment_id: string | null;
+  paid_at: string | null;
 };
 
 export type ProductReviewRow = {

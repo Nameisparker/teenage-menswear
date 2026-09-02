@@ -1,22 +1,80 @@
 import Link from "next/link";
-import { getAllProducts } from "@/lib/admin-catalog";
+import { getAllProducts, getCategoryOptions } from "@/lib/admin-catalog";
 import { formatPrice } from "@/lib/format";
 import { ProductImage } from "@/components/product-image";
 
 export const metadata = { title: "Admin — Products" };
 
-export default async function AdminProductsPage() {
-  const products = await getAllProducts();
-  const inactive = products.filter((p) => !p.isActive).length;
+export default async function AdminProductsPage(
+  props: PageProps<"/admin/products">
+) {
+  const { category } = await props.searchParams;
+  const [products, categories] = await Promise.all([
+    getAllProducts(),
+    getCategoryOptions(),
+  ]);
+
+  const requested = typeof category === "string" ? category : undefined;
+  /**
+   * One category at a time by default. The whole catalog in one table is a
+   * scroll, not a list — an admin editing shirts should not have to pass the
+   * jeans to get there. ?category=all is still there for a catalog-wide look.
+   */
+  const activeCategory =
+    requested === "all"
+      ? undefined
+      : categories.some((c) => c.slug === requested)
+        ? requested
+        : categories[0]?.slug;
+
+  const visible = activeCategory
+    ? products.filter((product) => product.categorySlug === activeCategory)
+    : products;
+  const inactive = visible.filter((product) => !product.isActive).length;
+
+  const countFor = (slug: string) =>
+    products.filter((product) => product.categorySlug === slug).length;
+
+  const tabClass = (active: boolean) =>
+    `rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+      active
+        ? "border-accent bg-accent text-accent-foreground"
+        : "border-black/15 hover:border-black/40 dark:border-white/20 dark:hover:border-white/50"
+    }`;
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold">Products</h1>
+        <h1 className="text-xl font-semibold">
+          {activeCategory
+            ? (categories.find((c) => c.slug === activeCategory)?.label ??
+              "Products")
+            : "All products"}
+        </h1>
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          {products.length} total
+          {visible.length} of {products.length}
           {inactive > 0 && ` · ${inactive} hidden from the storefront`}
         </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {categories.map((c) => (
+          <Link
+            key={c.id}
+            href={`/admin/products?category=${c.slug}`}
+            aria-current={activeCategory === c.slug ? "page" : undefined}
+            className={tabClass(activeCategory === c.slug)}
+          >
+            {c.label} · {countFor(c.slug)}
+          </Link>
+        ))}
+        <Link
+          href="/admin/products?category=all"
+          aria-current={activeCategory ? undefined : "page"}
+          className={tabClass(!activeCategory)}
+        >
+          All · {products.length}
+        </Link>
       </div>
 
       <div className="overflow-x-auto">
@@ -32,7 +90,7 @@ export default async function AdminProductsPage() {
             </tr>
           </thead>
           <tbody>
-            {products.map((product) => (
+            {visible.map((product) => (
               <tr
                 key={product.id}
                 className="border-b border-black/5 dark:border-white/5"
@@ -105,6 +163,14 @@ export default async function AdminProductsPage() {
           </tbody>
         </table>
       </div>
+
+      {visible.length === 0 && (
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          {products.length === 0
+            ? "No products yet. Add one first."
+            : "Nothing in this category yet."}
+        </p>
+      )}
     </div>
   );
 }
