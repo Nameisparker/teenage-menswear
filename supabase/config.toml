@@ -1,0 +1,7 @@
+project_id = "teenage-menswear"
+
+# Razorpay calls this one directly, with no Supabase session to present. Its
+# authentication is the webhook secret's signature over the raw body, checked
+# inside the function — see supabase/functions/razorpay-webhook/index.ts.
+[functions.razorpay-webhook]
+verify_jwt = false

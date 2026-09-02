@@ -129,6 +129,34 @@ export async function getProductBySlug(
   return toProduct(data as unknown as ProductWithRelations);
 }
 
+/**
+ * Other products from the same category, for the "You may also like" row.
+ *
+ * Takes the category slug rather than its uuid because that is what a Product
+ * carries — same reason getProductsByCategory does. Featured first, so the row
+ * leads with what the shop is pushing, then alphabetical for a stable order.
+ * The product being viewed is excluded in SQL, so `limit` is the row count.
+ */
+export async function getRelatedProducts(
+  categorySlug: string,
+  excludeProductId: string,
+  limit = 4
+): Promise<Product[]> {
+  const supabase = client();
+  const { data, error } = await supabase
+    .from("products")
+    .select(PRODUCT_SELECT)
+    .eq("categories.slug", categorySlug)
+    .neq("id", excludeProductId)
+    .order("featured", { ascending: false })
+    .order("name")
+    .limit(limit);
+
+  if (error) throw new CatalogUnavailableError(error.message);
+
+  return (data as unknown as ProductWithRelations[]).map(toProduct);
+}
+
 export async function getFeaturedProducts(): Promise<Product[]> {
   const supabase = client();
   const { data, error } = await supabase

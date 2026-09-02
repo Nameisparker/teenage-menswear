@@ -7,7 +7,7 @@ import { useNewOrders } from "@/context/new-orders-context";
 
 const LINKS = [
   { href: "/admin/products", label: "Products" },
-  { href: "/admin/orders", label: "Orders" },
+  { href: "/admin/featured", label: "Featured" },
   { href: "/admin/discounts", label: "Discounts" },
 ] as const;
 

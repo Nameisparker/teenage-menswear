@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getOrderByNumber } from "@/lib/orders";
 import { STATUS_LABELS, TRACKING_STAGES } from "@/lib/order-status";
+import { PaymentBadge } from "@/components/payment-badge";
 import { formatPrice } from "@/lib/format";
 import { ProductImage } from "@/components/product-image";
 import { StatusBadge } from "@/components/status-badge";
@@ -180,6 +181,12 @@ export default async function OrderTrackingPage(
           <div className="mt-6 flex justify-between border-t border-black/10 pt-4 text-lg font-semibold dark:border-white/10">
             <span>Total</span>
             <span>{formatPrice(order.total)}</span>
+          </div>
+          <div className="mt-3">
+            <PaymentBadge
+              method={order.paymentMethod}
+              status={order.paymentStatus}
+            />
           </div>
         </section>
 

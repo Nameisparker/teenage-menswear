@@ -236,7 +236,7 @@ export default async function Home() {
 
       {/* Visit us */}
       <section className="border-t border-black/10 bg-zinc-50 dark:border-white/10 dark:bg-zinc-950">
-        <div className="mx-auto grid max-w-6xl gap-10 px-4 py-16 sm:grid-cols-2 sm:px-6">
+        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
           <div className="flex flex-col gap-4">
             <h2 className="text-2xl font-semibold tracking-tight">
               Visit us in-store
@@ -255,22 +255,6 @@ export default async function Home() {
                 {STORE.phoneDisplay}
               </a>
             </div>
-          </div>
-
-          <div className="flex flex-col justify-center gap-1 rounded-xl border border-black/10 bg-white p-8 dark:border-white/10 dark:bg-black">
-            <span className="text-xs font-semibold tracking-wide text-accent">
-              STORE ADDRESS
-            </span>
-            <span className="mt-2 text-lg font-semibold">{STORE.name}</span>
-            <span className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-              {STORE.address}
-            </span>
-            <a
-              href={STORE.phoneHref}
-              className="mt-4 text-sm font-medium text-accent hover:underline"
-            >
-              Call {STORE.phoneDisplay}
-            </a>
           </div>
         </div>
       </section>
