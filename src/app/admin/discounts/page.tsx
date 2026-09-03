@@ -44,7 +44,9 @@ export default async function AdminDiscountsPage() {
         <table className="w-full min-w-[46rem] text-sm">
           <thead>
             <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-zinc-500 dark:border-white/10 dark:text-zinc-400">
-              <th className="py-2 pr-3 font-semibold">Product</th>
+              <th className="sticky left-0 z-10 bg-background py-2 pr-3 font-semibold">
+                Product
+              </th>
               <th className="py-2 pr-3 font-semibold">Price</th>
               <th className="py-2 pr-3 font-semibold">Discount</th>
               <th className="py-2 pr-3 font-semibold">Offer price</th>

@@ -46,7 +46,7 @@ export function DiscountRow({ product }: { product: AdminProduct }) {
 
   return (
     <tr className="border-b border-black/5 dark:border-white/5">
-      <td className="py-3 pr-3">
+      <td className="sticky left-0 z-10 bg-background py-3 pr-3">
         <div className="flex items-center gap-3">
           <ProductImage
             image={product.imagePath}

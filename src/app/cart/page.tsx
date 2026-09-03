@@ -85,6 +85,21 @@ export default function CartPage() {
                   <p className="text-sm text-zinc-500 dark:text-zinc-400">
                     Size: {item.size}
                   </p>
+                  {/* place_order refuses the whole order over a single short
+                      line, so saying it here — where the quantity can be
+                      changed — beats letting checkout be the first to mention
+                      it. */}
+                  {item.stock === 0 ? (
+                    <p className="mt-1 text-sm font-medium text-red-600 dark:text-red-400">
+                      Sold out — remove this to check out.
+                    </p>
+                  ) : (
+                    item.quantity > item.stock && (
+                      <p className="mt-1 text-sm font-medium text-red-600 dark:text-red-400">
+                        Only {item.stock} left. Reduce the quantity to check out.
+                      </p>
+                    )
+                  )}
                 </div>
                 <Price
                   price={item.price}
@@ -102,7 +117,7 @@ export default function CartPage() {
                     onClick={() =>
                       void updateQuantity(item.slug, item.size, item.quantity - 1)
                     }
-                    className="flex h-8 w-8 items-center justify-center rounded-md border border-black/15 dark:border-white/20"
+                    className="flex h-10 w-10 items-center justify-center rounded-md border border-black/15 sm:h-8 sm:w-8 dark:border-white/20"
                     aria-label="Decrease quantity"
                   >
                     −
@@ -115,7 +130,8 @@ export default function CartPage() {
                     onClick={() =>
                       void updateQuantity(item.slug, item.size, item.quantity + 1)
                     }
-                    className="flex h-8 w-8 items-center justify-center rounded-md border border-black/15 dark:border-white/20"
+                    disabled={item.quantity >= item.stock}
+                    className="flex h-10 w-10 items-center justify-center rounded-md border border-black/15 disabled:opacity-40 sm:h-8 sm:w-8 dark:border-white/20"
                     aria-label="Increase quantity"
                   >
                     +

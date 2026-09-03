@@ -33,9 +33,38 @@ const securityHeaders = [
   },
 ];
 
+/**
+ * Host of the Supabase project, for the image optimiser's allowlist. Empty on a
+ * clone with no .env.local, which is fine — there are no uploads to serve.
+ */
+const supabaseHost = (() => {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!url) return null;
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return null;
+  }
+})();
+
 const nextConfig: NextConfig = {
   // The version banner is free reconnaissance for anyone scanning.
   poweredByHeader: false,
+
+  // Admin-uploaded product images come from Supabase Storage, so the optimiser
+  // has to be told that host is legitimate. Anything still under public/ is
+  // untouched by this.
+  images: {
+    remotePatterns: supabaseHost
+      ? [
+          {
+            protocol: "https" as const,
+            hostname: supabaseHost,
+            pathname: "/storage/v1/object/public/**",
+          },
+        ]
+      : [],
+  },
 
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];

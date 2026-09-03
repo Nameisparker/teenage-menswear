@@ -30,6 +30,19 @@ type PlacedOrder = {
 /** Maps a place_order failure onto something a customer can act on. */
 function checkoutError(message: string): string {
   const lower = message.toLowerCase();
+  // place_order words this one for the customer, naming the product, the size
+  // and how many are left, so it is shown through rather than replaced — a
+  // generic failure here leaves them with nothing to fix.
+  const shortage = message.match(/out of stock:\s*(.+)$/i);
+  if (shortage) {
+    // "only 0 left" is accurate and reads terribly. At zero the customer does
+    // not need a number, they need to know it has gone and what to do.
+    const gone = message.match(/only 0 left of "(.+?)" in size (.+?)\./i);
+    if (gone) {
+      return `${gone[1]} in size ${gone[2]} just sold out. Please remove it from your cart.`;
+    }
+    return `${shortage[1]} Please update your cart and retry.`;
+  }
   if (lower.includes("cart is empty")) return "Your cart is empty.";
   if (lower.includes("not signed in")) {
     return "Your session expired. Please sign in again.";
@@ -159,6 +172,14 @@ export default function CheckoutPage() {
     const order = data as PlacedOrder;
 
     if (method === "cod") {
+      // Best effort, and deliberately not awaited: the order is placed either
+      // way, and the confirmation view must not wait on an email. Prepaid
+      // orders are not notified here — razorpay-verify sends theirs once the
+      // money actually arrives, so this would be a duplicate.
+      void supabase.functions.invoke("notify-order", {
+        body: { orderId: order.id, event: "placed" },
+      });
+
       setPlaced(order);
       // place_order clears the cart server-side; sync local state to match.
       await refresh();

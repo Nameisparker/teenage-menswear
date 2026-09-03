@@ -81,10 +81,13 @@ export default async function AdminProductsPage(
         <table className="w-full min-w-[46rem] text-sm">
           <thead>
             <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-zinc-500 dark:border-white/10 dark:text-zinc-400">
-              <th className="py-2 pr-3 font-semibold">Product</th>
+              <th className="sticky left-0 z-10 bg-background py-2 pr-3 font-semibold">
+                Product
+              </th>
               <th className="py-2 pr-3 font-semibold">Category</th>
               <th className="py-2 pr-3 font-semibold">Price</th>
               <th className="py-2 pr-3 font-semibold">Sizes</th>
+              <th className="py-2 pr-3 font-semibold">Stock</th>
               <th className="py-2 pr-3 font-semibold">Status</th>
               <th className="py-2 font-semibold" />
             </tr>
@@ -95,7 +98,7 @@ export default async function AdminProductsPage(
                 key={product.id}
                 className="border-b border-black/5 dark:border-white/5"
               >
-                <td className="py-3 pr-3">
+                <td className="sticky left-0 z-10 bg-background py-3 pr-3">
                   <div className="flex items-center gap-3">
                     <ProductImage
                       image={product.imagePath}
@@ -130,6 +133,9 @@ export default async function AdminProductsPage(
                 </td>
                 <td className="py-3 pr-3 text-zinc-600 dark:text-zinc-400">
                   {product.sizes.join(", ") || "—"}
+                </td>
+                <td className="py-3 pr-3 whitespace-nowrap">
+                  <StockCell variants={product.variants} />
                 </td>
                 <td className="py-3 pr-3">
                   <div className="flex flex-wrap gap-1">
@@ -170,6 +176,40 @@ export default async function AdminProductsPage(
             ? "No products yet. Add one first."
             : "Nothing in this category yet."}
         </p>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Units left, in one cell. The total is what an admin scans for; the sold-out
+ * count is what makes them open the product and restock it.
+ */
+function StockCell({
+  variants,
+}: {
+  variants: { size: string; stock: number }[];
+}) {
+  if (variants.length === 0) {
+    return <span className="text-zinc-500 dark:text-zinc-400">&mdash;</span>;
+  }
+
+  const total = variants.reduce((sum, variant) => sum + variant.stock, 0);
+  const out = variants.filter((variant) => variant.stock === 0).length;
+
+  return (
+    <div className="flex flex-col">
+      <span
+        className={
+          total === 0 ? "font-medium text-red-700 dark:text-red-400" : ""
+        }
+      >
+        {total}
+      </span>
+      {out > 0 && (
+        <span className="text-xs text-amber-700 dark:text-amber-500">
+          {out} size{out === 1 ? "" : "s"} out
+        </span>
       )}
     </div>
   );

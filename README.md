@@ -306,6 +306,123 @@ supabase functions deploy razorpay-webhook --no-verify-jwt
 Without step 4 payments still work — verification happens in the browser round
 trip — but a customer who closes the tab mid-payment leaves a paid payment
 against an unpaid order until someone reconciles it by hand.
+## Product images
+
+Images are uploaded from the admin product form to the `product-images` Storage
+bucket, created by `20260903045944_product_image_storage.sql`. Reads are public;
+writes require `is_admin()`, and the upload runs in the browser with the admin's
+own session, so that policy is the boundary.
+
+`products.image_path` holds either a bucket key (`shirt-1757000000000.jpg`) or a
+path under `public/` (`/products/shirts/shirt_01.jpg`, which is what everything
+seeded before Storage existed still uses). `productImageSrc()` in
+`src/lib/images.ts` is the only thing that knows the difference — it is what
+`ProductImage` resolves through, and both forms keep working.
+
+`next.config.ts` allows the Supabase storage host in `images.remotePatterns`,
+derived from `NEXT_PUBLIC_SUPABASE_URL`. Replacing a product's image deletes the
+old object, but only when no other product row still points at it.
+
+
+### The gallery
+
+`products.image_path` is the cover. `product_images` holds the extra angles and
+is only fetched on the product page — a category listing has no use for four
+more rows per product. `ProductGallery` shows the cover plus those as a
+thumbnail strip, and falls back to a plain image when there is only one.
+
+Order is upload order (`sort_order` is one past the current highest on insert).
+Deleting a product cascades its `product_images` rows away but not the objects
+in Storage; a removed gallery image deletes its file only when neither another
+product's cover nor another gallery still references it.
+## Stock
+
+`product_variants.stock` is enforced, not decorative.
+
+`place_order` locks the variant rows the cart touches, refuses the order with a
+`P0003` naming the product and size if any line is short, and decrements in the
+same transaction as the insert. Doing it from the application would leave a gap
+between the read and the write, and that gap is where an oversell happens.
+
+Stock is held from the moment an order exists, prepaid and unpaid included. Two
+things give it back:
+
+- `orders_restore_stock_on_cancel`, when an order still in `pending` or
+  `confirmed` is cancelled. `orders.stock_held` makes that exactly-once, and
+  keeps orders placed before enforcement (all `false`) from inventing units.
+- `cancel_stale_unpaid_orders()`, run every ten minutes by `pg_cron`, which
+  cancels prepaid orders left unpaid for over half an hour. If the customer pays
+  after that, `razorpay-verify` and `razorpay-webhook` still record the money and
+  write a `payment_error` saying it needs a refund.
+
+The storefront disables sold-out sizes, says "Only N left" at five or fewer, and
+the cart flags a line that has outgrown its stock. An admin sets the numbers per
+size on the product page.
+
+## Notifications
+
+The customer is told when a COD order is placed, when a prepaid payment lands,
+and when the status changes. The admin's realtime bell is unrelated and unchanged.
+
+`supabase/functions/_shared/notify.ts` composes the messages and delivers them.
+One transport is implemented — email via Resend — and **with no key configured
+every message is logged instead of sent**, visible in the function logs. So the
+wiring works before you have signed up for anything.
+
+```bash
+supabase secrets set RESEND_API_KEY=re_xxx
+supabase secrets set NOTIFY_FROM_EMAIL="Teenage Menswear <orders@yourdomain>"
+supabase secrets set SITE_URL=https://yourdomain
+```
+
+`SITE_URL` is what makes the tracking link absolute; without it the message
+carries a relative path.
+
+Who calls what:
+
+| Event | Caller | Function |
+| --- | --- | --- |
+| COD order placed | checkout page | `notify-order` (`event: "placed"`) |
+| Prepaid payment confirmed | `razorpay-verify` / `razorpay-webhook` | `deliver()` inline |
+| Status changed by an admin | `setOrderStatus` | `notify-order` (`event: "status"`) |
+
+`notify-order` decides the wording itself from the order's current state — a
+caller can ask for a notification about its own order but cannot dictate what it
+says. Every send is best-effort: `deliver()` never throws, because an order is
+not less placed because an email bounced.
+
+WhatsApp is the obvious next transport for an Indian store, and goes in
+`deliver()` beside the email branch. Everything above that function is
+channel-agnostic.
+
+## Tests and CI
+
+```bash
+npm test          # vitest, once
+npm run test:watch
+npm run typecheck # next typegen && tsc --noEmit
+npm run lint
+```
+
+Unit tests live beside what they test (`src/lib/pricing.test.ts`) and cover the
+pure logic: discount arithmetic, the listing's sort and filter rules, image path
+resolution, and phone validation. `environment: "node"` — no DOM, no database.
+
+`src/lib/pricing.test.ts` is a contract with the database, not just with the
+function: `offerPriceFor()` mirrors the `products.offer_price` generated column,
+including how a half rounds. If one has to change, the migration changes with it.
+
+`.github/workflows/ci.yml` runs `next typegen`, `tsc --noEmit`, `eslint` and
+`vitest run` on every push and pull request. `typegen` is not optional: route
+types like `PageProps<"/products">` are generated into `.next/`, which is not
+committed, so a clean checkout cannot type-check without it. It needs no env
+vars, which is what keeps the whole job secret-free.
+
+`next build` and end-to-end tests are deliberately absent. The catalog read
+throws rather than rendering an empty storefront when Supabase is unreachable,
+so both need real credentials and a seeded project — worth adding behind repo
+secrets, not worth faking with a build that cannot fetch.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

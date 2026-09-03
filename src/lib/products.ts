@@ -27,7 +27,10 @@ const SIZES_ONE = ["One Size"];
  * Re-running the seed leaves existing discounts alone: its upsert never names
  * those columns.
  */
-export type SeedProduct = Omit<Product, "discountPercent" | "offerPrice">;
+export type SeedProduct = Omit<
+  Product,
+  "discountPercent" | "offerPrice" | "stockBySize" | "images"
+>;
 
 export const PRODUCTS: SeedProduct[] = [
   // Shirts

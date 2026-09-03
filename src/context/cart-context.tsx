@@ -72,6 +72,7 @@ type CartRow = {
     discount_percent: number;
     offer_price: number;
     image_path: string;
+    product_variants: { size: string; stock: number }[];
   } | null;
 };
 
@@ -82,7 +83,15 @@ type CartFetch =
   | null;
 
 const CART_SELECT =
-  "id, product_id, size, quantity, products!inner ( slug, name, price, discount_percent, offer_price, image_path )";
+  [
+    "id, product_id, size, quantity,",
+    "products!inner (",
+    "  slug, name, price, discount_percent, offer_price, image_path,",
+    // Every size rather than just this row: PostgREST cannot filter an embed
+    // by a sibling column, and a product has a handful of variants at most.
+    "  product_variants ( size, stock )",
+    ")",
+  ].join(" ");
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const { user, loading: authLoading } = useAuth();
@@ -133,6 +142,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
           size: row.size,
           image: row.products!.image_path,
           quantity: row.quantity,
+          stock:
+            row.products!.product_variants.find(
+              (variant) => variant.size === row.size
+            )?.stock ?? 0,
         })),
     };
   }, [user]);

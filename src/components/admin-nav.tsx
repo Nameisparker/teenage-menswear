@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { useNewOrders } from "@/context/new-orders-context";
 
 const LINKS = [
+  { href: "/admin", label: "Dashboard" },
   { href: "/admin/products", label: "Products" },
   { href: "/admin/featured", label: "Featured" },
   { href: "/admin/discounts", label: "Discounts" },
@@ -30,7 +31,12 @@ export function AdminNav() {
   return (
     <nav className="flex gap-4 text-sm font-medium">
       {LINKS.map((link) => {
-        const active = pathname.startsWith(link.href);
+        // "/admin" is a prefix of every admin route, so it needs an exact
+        // match or the dashboard tab would look active on every screen.
+        const active =
+          link.href === "/admin"
+            ? pathname === "/admin"
+            : pathname.startsWith(link.href);
         return (
           <Link
             key={link.href}

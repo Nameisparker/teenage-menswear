@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { productImageSrc } from "@/lib/images";
 
 export function ProductImage({
   image,
@@ -16,7 +17,7 @@ export function ProductImage({
   return (
     <div className={`relative overflow-hidden bg-zinc-50 dark:bg-zinc-900 ${className}`}>
       <Image
-        src={image}
+        src={productImageSrc(image)}
         alt={name}
         fill
         sizes={sizes ?? "(min-width: 1024px) 25vw, 50vw"}
