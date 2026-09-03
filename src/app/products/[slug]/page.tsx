@@ -9,7 +9,7 @@ import {
 } from "@/lib/catalog";
 import { SITE_URL } from "@/lib/site";
 import { Price } from "@/components/price";
-import { ProductImage } from "@/components/product-image";
+import { ProductGallery } from "@/components/product-gallery";
 import { ProductCard } from "@/components/product-card";
 import { ProductInfo } from "@/components/product-info";
 import { AddToCartButton } from "@/components/add-to-cart-button";
@@ -74,13 +74,7 @@ export default async function ProductPage(props: PageProps<"/products/[slug]">) 
   return (
     <>
       <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 sm:px-6 sm:grid-cols-2">
-        <ProductImage
-          image={product.image}
-          name={product.name}
-          className="aspect-square w-full rounded-lg"
-          sizes="(min-width: 640px) 50vw, 100vw"
-          priority
-        />
+        <ProductGallery images={product.images} name={product.name} />
 
         <div className="flex flex-col gap-6">
           <div className="flex flex-col items-start">

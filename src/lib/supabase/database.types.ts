@@ -30,6 +30,12 @@ export type CategoryRow = {
   sort_order: number;
 };
 
+export type ProductImageRow = {
+  id: string;
+  image_path: string;
+  sort_order: number;
+};
+
 export type ProductVariantRow = {
   size: string;
   sort_order: number;
@@ -55,6 +61,8 @@ export type ProductRow = {
 export type ProductWithRelations = ProductRow & {
   categories: Pick<CategoryRow, "slug" | "label"> | null;
   product_variants: ProductVariantRow[];
+  /** Only selected on the product page query; absent on list queries. */
+  product_images?: Pick<ProductImageRow, "image_path" | "sort_order">[];
 };
 
 export type StoreSettingsRow = {
@@ -112,6 +120,8 @@ export type OrderRow = {
   razorpay_order_id: string | null;
   razorpay_payment_id: string | null;
   paid_at: string | null;
+  /** True while this order is holding units in product_variants. */
+  stock_held: boolean;
   /** Razorpay's error_description for the last failed attempt, if any. */
   payment_error: string | null;
 };

@@ -7,9 +7,12 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "next typegen && tsc --noEmit",
     "check:auth": "node scripts/check-auth-config.mjs",
     "seed:sql": "node scripts/gen-catalog-seed.mjs",
-    "check:db": "node scripts/check-db.mjs"
+    "check:db": "node scripts/check-db.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",
@@ -27,6 +30,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.2",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.11"
   }
 }

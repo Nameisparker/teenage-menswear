@@ -14,6 +14,7 @@
  */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { env, hmacSha256Hex, json, safeEqual } from "../_shared/razorpay.ts";
+import { deliver, paymentReceivedMessage } from "../_shared/notify.ts";
 
 Deno.serve(async (req) => {
   try {
@@ -45,7 +46,9 @@ Deno.serve(async (req) => {
 
     const { data: order, error } = await asService
       .from("orders")
-      .select("id, user_id, payment_status")
+      .select(
+        "id, user_id, order_number, status, payment_status, total, ship_full_name, ship_phone, ship_email"
+      )
       .eq("razorpay_order_id", razorpayOrderId)
       .maybeSingle();
 
@@ -57,18 +60,41 @@ Deno.serve(async (req) => {
 
     if (event.event === "payment.captured") {
       if (order.payment_status !== "paid") {
+        // The stale-payment job may already have cancelled this order and
+        // given its stock back. The money is still real, so it is recorded —
+        // but flagged, because a paid cancelled order needs a human.
+        const cancelled = order.status === "cancelled";
+
         await asService
           .from("orders")
           .update({
             payment_status: "paid",
             razorpay_payment_id: payment.id,
             paid_at: new Date().toISOString(),
-            // A retry that succeeds clears the earlier attempt's reason.
-            payment_error: null,
+            payment_error: cancelled
+              ? "Paid after the order was cancelled for non-payment — refund or re-place it."
+              // A retry that succeeds clears the earlier attempt's reason.
+              : null,
           })
           .eq("id", order.id);
 
-        await asService.from("cart_items").delete().eq("user_id", order.user_id);
+        // Only if the order stands: a cancelled one leaves the customer their
+        // cart to re-order from.
+        if (!cancelled) {
+          await asService.from("cart_items").delete().eq("user_id", order.user_id);
+
+          // The customer is not here — this path exists precisely because
+          // their tab closed — so this message is the only thing that tells
+          // them the payment landed.
+          await deliver(
+            {
+              name: order.ship_full_name,
+              phone: order.ship_phone,
+              email: order.ship_email,
+            },
+            paymentReceivedMessage(order)
+          );
+        }
       }
       return json({ ok: true });
     }

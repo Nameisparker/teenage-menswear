@@ -22,7 +22,7 @@ import type { Product, Review } from "./types";
  * Columns needed to render a product, plus its category slug and sizes.
  *
  * `!inner` matters: without it, a filter on `categories.slug` does not restrict
- * the parent rows at all — PostgREST returns every product and merely nullifies
+ * the parent rows at all â PostgREST returns every product and merely nullifies
  * the embed, so category filtering silently returns the whole catalog. The join
  * is safe to make inner unconditionally because products.category_id is NOT NULL.
  */
@@ -52,7 +52,7 @@ function client() {
   const supabase = getSupabaseAnonClient();
   if (!supabase) {
     throw new CatalogUnavailableError(
-      "Supabase is not configured — NEXT_PUBLIC_SUPABASE_URL / _ANON_KEY missing"
+      "Supabase is not configured â NEXT_PUBLIC_SUPABASE_URL / _ANON_KEY missing"
     );
   }
   return supabase;
@@ -74,13 +74,27 @@ function toProduct(row: ProductWithRelations): Product {
     sizes: [...row.product_variants]
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((variant) => variant.size),
+    // Same rows, keyed by size: the PDP needs to know which chips to disable
+    // and when to say "only 2 left", and re-querying for that would be a
+    // second round-trip for data already in hand.
+    stockBySize: Object.fromEntries(
+      row.product_variants.map((variant) => [variant.size, variant.stock])
+    ),
     image: row.image_path,
+    // Cover first, then whatever extra angles were fetched. Only the product
+    // page asks for product_images, so on a card this is a one-item list.
+    images: [
+      row.image_path,
+      ...[...(row.product_images ?? [])]
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map((extra) => extra.image_path),
+    ],
     featured: row.featured,
   };
 }
 
 // Wrapped in React's cache() because generateMetadata() and the RootLayout
-// component both need this per request — without dedup that's two separate
+// component both need this per request â without dedup that's two separate
 // round-trips to Supabase for the same rows on every navigation.
 export const getCategories = cache(async function getCategories(): Promise<
   { value: string; label: string }[]
@@ -119,7 +133,10 @@ export async function getProductBySlug(
   const supabase = client();
   const { data, error } = await supabase
     .from("products")
-    .select(PRODUCT_SELECT)
+    // The gallery is only wanted here, so it is appended to the shared select
+    // rather than folded into it — a category listing has no use for four
+    // extra rows per product.
+    .select(PRODUCT_SELECT + ", product_images ( image_path, sort_order )")
     .eq("slug", slug)
     .maybeSingle();
 
@@ -133,7 +150,7 @@ export async function getProductBySlug(
  * Other products from the same category, for the "You may also like" row.
  *
  * Takes the category slug rather than its uuid because that is what a Product
- * carries — same reason getProductsByCategory does. Featured first, so the row
+ * carries â same reason getProductsByCategory does. Featured first, so the row
  * leads with what the shop is pushing, then alphabetical for a stable order.
  * The product being viewed is excluded in SQL, so `limit` is the row count.
  */
@@ -192,7 +209,7 @@ export const getStoreSettings = cache(async function getStoreSettings(): Promise
   return data as StoreSettingsRow;
 });
 
-/** Newest first, like Amazon/Flipkart — reviewers want to see recent opinions. */
+/** Newest first, like Amazon/Flipkart â reviewers want to see recent opinions. */
 export async function getProductReviews(productId: string): Promise<Review[]> {
   const supabase = client();
   const { data, error } = await supabase

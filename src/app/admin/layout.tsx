@@ -31,12 +31,12 @@ export default async function AdminLayout({
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-      <div className="mb-8 flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-black/10 pb-4 dark:border-white/10">
+      <div className="mb-8 flex flex-wrap items-center gap-x-6 gap-y-3 border-b border-black/10 pb-4 dark:border-white/10">
         <span className="text-lg font-semibold">Admin</span>
         <AdminNav />
         <Link
           href="/admin/products/new"
-          className="ml-auto flex h-10 items-center justify-center rounded-full bg-accent px-4 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90"
+          className="flex h-10 w-full items-center justify-center rounded-full bg-accent px-4 text-sm font-medium text-accent-foreground transition-opacity hover:opacity-90 sm:ml-auto sm:w-auto"
         >
           Add product
         </Link>

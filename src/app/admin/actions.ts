@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { OrderStatus } from "@/lib/supabase/database.types";
 import { MAX_DISCOUNT_PERCENT } from "@/lib/pricing";
+import { PRODUCT_IMAGE_BUCKET } from "@/lib/images";
 
 /**
  * Admin mutations.
@@ -141,6 +142,52 @@ async function syncVariants(
 
   return null;
 }
+/**
+ * Deletes an image that nothing points at any more.
+ *
+ * Only for objects in the bucket: a path under /public is a committed file and
+ * deleting it is not this function's business. The "is anyone still using it?"
+ * check is the point, and it has to look in both places — a file can be one
+ * product's cover and another's second angle, and swapping either must not
+ * blank the other.
+ *
+ * Every failure is logged and swallowed. An orphaned object costs a fraction of
+ * a cent; a save that fails because a cleanup did is a real problem.
+ */
+async function deleteUnusedImage(
+  supabase: NonNullable<Awaited<ReturnType<typeof getSupabaseServerClient>>>,
+  imagePath: string
+): Promise<void> {
+  if (!imagePath || imagePath.startsWith("/") || /^https?:\/\//i.test(imagePath)) {
+    return;
+  }
+
+  const [covers, gallery] = await Promise.all([
+    supabase.from("products").select("id").eq("image_path", imagePath).limit(1),
+    supabase
+      .from("product_images")
+      .select("id")
+      .eq("image_path", imagePath)
+      .limit(1),
+  ]);
+
+  if (covers.error || gallery.error) {
+    console.error(
+      "deleteUnusedImage lookup:",
+      covers.error?.message ?? gallery.error?.message
+    );
+    return;
+  }
+  if (covers.data.length > 0 || gallery.data.length > 0) return;
+
+  const { error: removeError } = await supabase.storage
+    .from(PRODUCT_IMAGE_BUCKET)
+    .remove([imagePath]);
+
+  if (removeError) {
+    console.error("deleteUnusedImage remove:", removeError.message);
+  }
+}
 
 export async function saveProduct(
   formData: FormData
@@ -166,7 +213,7 @@ export async function saveProduct(
   if (!Number.isFinite(price) || price <= 0) {
     return { ok: false, error: "Price must be a whole number above zero." };
   }
-  if (!imagePath) return { ok: false, error: "Image path is required." };
+  if (!imagePath) return { ok: false, error: "Upload an image for this product." };
   if (sizes.length === 0) {
     return { ok: false, error: "Add at least one size." };
   }
@@ -185,9 +232,21 @@ export async function saveProduct(
   let productId = id;
 
   if (id) {
+    // Read before writing so a swapped-out image can be cleaned up after.
+    const { data: existing } = await supabase
+      .from("products")
+      .select("image_path")
+      .eq("id", id)
+      .maybeSingle();
+
     const { error } = await supabase.from("products").update(row).eq("id", id);
     if (error) {
       return failed("saveProduct update", error.message, "Could not save the product.");
+    }
+
+    const previous = (existing as { image_path: string } | null)?.image_path;
+    if (previous && previous !== imagePath) {
+      await deleteUnusedImage(supabase, previous);
     }
   } else {
     const { data, error } = await supabase
@@ -206,16 +265,141 @@ export async function saveProduct(
     return failed("syncVariants", variantError, "Could not save the sizes.");
   }
 
+  /**
+   * Stock arrives as `stock:<size>` fields from the edit form, so the page has
+   * one save button instead of one per size.
+   *
+   * After syncVariants, so a size added in this same save exists to receive a
+   * number, and filtered to the sizes that survived it, so the box for a size
+   * just removed is ignored rather than recreating it. Validated in full before
+   * anything is written: a bad number in the third box must not leave the first
+   * two applied.
+   */
+  const stockFields = [...formData.entries()]
+    .filter(([key]) => key.startsWith("stock:"))
+    .map(([key, value]) => ({
+      size: key.slice("stock:".length),
+      units: Number(value),
+    }))
+    .filter((field) => sizes.includes(field.size));
+
+  for (const field of stockFields) {
+    if (!Number.isInteger(field.units) || field.units < 0) {
+      return {
+        ok: false,
+        error: `Stock for size ${field.size} must be a whole number, zero or more.`,
+      };
+    }
+  }
+
+  for (const field of stockFields) {
+    const { error } = await supabase
+      .from("product_variants")
+      .update({ stock: field.units })
+      .eq("product_id", productId)
+      .eq("size", field.size);
+
+    if (error) {
+      return failed("saveProduct stock", error.message, "Could not save the stock.");
+    }
+  }
+
   // The storefront caches catalog pages for 60s; drop them now so an admin
   // sees their own edit immediately rather than waiting out the window.
   revalidatePath("/");
   revalidatePath("/products");
   revalidatePath(`/products/${slug}`);
   revalidatePath("/admin/products");
+  // Stock moved, so the dashboard's counts and restock list did too.
+  revalidatePath("/admin");
 
   return { ok: true };
 }
 
+
+/**
+ * Adds one more image to a product's gallery.
+ *
+ * The file is already in the bucket — the browser put it there with the admin's
+ * own session — so this only records it. sort_order is one past the current
+ * highest, which makes upload order the display order.
+ */
+export async function addProductImage(
+  productId: string,
+  imagePath: string
+): Promise<ActionResult> {
+  const { supabase, error: adminError } = await requireAdmin();
+  if (!supabase) return { ok: false, error: adminError ?? "Unauthorised." };
+
+  if (!imagePath.trim()) return { ok: false, error: "No image to add." };
+
+  const { data: last, error: readError } = await supabase
+    .from("product_images")
+    .select("sort_order")
+    .eq("product_id", productId)
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (readError) {
+    return failed("addProductImage read", readError.message, "Could not add the image.");
+  }
+
+  const nextOrder = ((last as { sort_order: number } | null)?.sort_order ?? -1) + 1;
+
+  const { error } = await supabase
+    .from("product_images")
+    .insert({
+      product_id: productId,
+      image_path: imagePath.trim(),
+      sort_order: nextOrder,
+    });
+
+  if (error) {
+    return failed("addProductImage", error.message, "Could not add the image.");
+  }
+
+  revalidatePath("/products/[slug]", "page");
+  revalidatePath("/admin/products/[id]", "page");
+  return { ok: true };
+}
+
+/**
+ * Removes a gallery image, and the file behind it when nothing else uses it.
+ *
+ * The row is read before it is deleted because the path is needed afterwards,
+ * and reading it back once it is gone is not an option.
+ */
+export async function removeProductImage(imageId: string): Promise<ActionResult> {
+  const { supabase, error: adminError } = await requireAdmin();
+  if (!supabase) return { ok: false, error: adminError ?? "Unauthorised." };
+
+  const { data: image, error: readError } = await supabase
+    .from("product_images")
+    .select("image_path")
+    .eq("id", imageId)
+    .maybeSingle();
+
+  if (readError) {
+    return failed("removeProductImage read", readError.message, "Could not remove the image.");
+  }
+
+  const { error } = await supabase
+    .from("product_images")
+    .delete()
+    .eq("id", imageId);
+
+  if (error) {
+    return failed("removeProductImage", error.message, "Could not remove the image.");
+  }
+
+  const path = (image as { image_path: string } | null)?.image_path;
+  if (path) await deleteUnusedImage(supabase, path);
+
+  revalidatePath("/products/[slug]", "page");
+  revalidatePath("/admin/products/[id]", "page");
+  return { ok: true };
+}
 export async function setProductActive(
   productId: string,
   isActive: boolean
@@ -274,6 +458,7 @@ export async function setProductFeatured(
   revalidatePath("/admin/featured");
   return { ok: true };
 }
+
 export async function setOrderStatus(
   orderId: string,
   status: OrderStatus
@@ -290,6 +475,17 @@ export async function setOrderStatus(
 
   if (error) {
     return failed("setOrderStatus", error.message, "Could not update the order.");
+  }
+
+  // Best effort. The status change is committed and the customer's tracking
+  // timeline already shows it; a bounced email must not turn a successful
+  // update into a failure the admin has to retry.
+  try {
+    await supabase.functions.invoke("notify-order", {
+      body: { orderId, event: "status" },
+    });
+  } catch (notifyError) {
+    console.error("setOrderStatus notify", notifyError);
   }
 
   revalidatePath("/admin/orders");

@@ -36,12 +36,19 @@ export type AdminProduct = {
   categoryId: string;
   categorySlug: string;
   sizes: string[];
+  /** Sizes again, with the units left against each. Input for the stock editor. */
+  variants: { size: string; stock: number }[];
+  /**
+   * Extra images beyond the cover, in display order. Only getProductById
+   * fetches these — the products table has no use for them.
+   */
+  galleryImages: { id: string; imagePath: string }[];
 };
 
 const ADMIN_PRODUCT_SELECT = `
   id, slug, name, price, discount_percent, offer_price, description, image_path, featured, is_active, category_id,
   categories!inner ( slug, label ),
-  product_variants ( size, sort_order )
+  product_variants ( size, sort_order, stock )
 `;
 
 type AdminProductRow = {
@@ -57,7 +64,8 @@ type AdminProductRow = {
   is_active: boolean;
   category_id: string;
   categories: { slug: string; label: string };
-  product_variants: { size: string; sort_order: number }[];
+  product_variants: { size: string; sort_order: number; stock: number }[];
+  product_images?: { id: string; image_path: string; sort_order: number }[];
 };
 
 function toAdminProduct(row: AdminProductRow): AdminProduct {
@@ -77,6 +85,12 @@ function toAdminProduct(row: AdminProductRow): AdminProduct {
     sizes: [...row.product_variants]
       .sort((a, b) => a.sort_order - b.sort_order)
       .map((variant) => variant.size),
+    variants: [...row.product_variants]
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((variant) => ({ size: variant.size, stock: variant.stock })),
+    galleryImages: [...(row.product_images ?? [])]
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((image) => ({ id: image.id, imagePath: image.image_path })),
   };
 }
 
@@ -105,7 +119,10 @@ export async function getProductById(
 
   const { data, error } = await supabase
     .from("products")
-    .select(ADMIN_PRODUCT_SELECT)
+    .select(
+      ADMIN_PRODUCT_SELECT +
+        ", product_images ( id, image_path, sort_order )"
+    )
     .eq("id", id)
     .maybeSingle();
 

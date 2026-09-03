@@ -11,7 +11,7 @@ export const metadata = { title: "Admin — Featured" };
 function ProductRow({ product }: { product: AdminProduct }) {
   return (
     <tr className="border-b border-black/5 dark:border-white/5">
-      <td className="py-3 pr-3">
+      <td className="sticky left-0 z-10 bg-background py-3 pr-3">
         <div className="flex items-center gap-3">
           <ProductImage
             image={product.imagePath}
@@ -70,7 +70,9 @@ function TableHead() {
   return (
     <thead>
       <tr className="border-b border-black/10 text-left text-xs uppercase tracking-wide text-zinc-500 dark:border-white/10 dark:text-zinc-400">
-        <th className="py-2 pr-3 font-semibold">Product</th>
+        <th className="sticky left-0 z-10 bg-background py-2 pr-3 font-semibold">
+          Product
+        </th>
         <th className="py-2 pr-3 font-semibold">Price</th>
         <th className="py-2 pr-3 font-semibold">Status</th>
         <th className="py-2 font-semibold" />

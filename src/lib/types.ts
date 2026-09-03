@@ -17,7 +17,17 @@ export type Product = {
   offerPrice: number;
   description: string;
   sizes: string[];
+  /**
+   * Units left, by size. Filled by catalog.ts from product_variants; a size
+   * missing from the map is a size that cannot be bought.
+   */
+  stockBySize: Record<string, number>;
   image: string; // path under /public
+  /**
+   * The gallery in display order, cover first. Only the product page fetches
+   * the extra angles, so elsewhere this is just [image].
+   */
+  images: string[];
   featured?: boolean;
 };
 
@@ -43,4 +53,9 @@ export type CartItem = {
   size: string;
   image: string;
   quantity: number;
+  /**
+   * Units available of this size right now. Fetched with the cart so a line
+   * that has outgrown its stock can say so before checkout does.
+   */
+  stock: number;
 };
