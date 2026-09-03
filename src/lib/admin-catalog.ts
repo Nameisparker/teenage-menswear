@@ -156,6 +156,12 @@ export type AdminOrder = {
   status: OrderStatus;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
+  /** Razorpay's own ids, for reconciling a payment against their dashboard. */
+  razorpayOrderId: string | null;
+  razorpayPaymentId: string | null;
+  paidAt: string | null;
+  /** Why the last attempt failed, in Razorpay's words. Null for COD. */
+  paymentError: string | null;
   /** List-price sum. Greater than total when something was discounted. */
   subtotal: number;
   total: number;
@@ -181,6 +187,7 @@ export type AdminOrderDetail = AdminOrder & {
 const ADMIN_ORDER_SELECT = `
   id, order_number, status, subtotal, total, placed_at,
   payment_method, payment_status,
+  razorpay_order_id, razorpay_payment_id, paid_at, payment_error,
   ship_full_name, ship_phone, ship_email, ship_line1, ship_city, ship_pin_code,
   order_items ( name, slug, size, unit_price, quantity, image_path )
 `;
@@ -191,6 +198,10 @@ type AdminOrderRow = {
   status: OrderStatus;
   payment_method: PaymentMethod;
   payment_status: PaymentStatus;
+  razorpay_order_id: string | null;
+  razorpay_payment_id: string | null;
+  paid_at: string | null;
+  payment_error: string | null;
   subtotal: number;
   total: number;
   placed_at: string;
@@ -227,6 +238,10 @@ function toAdminOrder(row: AdminOrderRow): AdminOrder {
     status: row.status,
     paymentMethod: row.payment_method,
     paymentStatus: row.payment_status,
+    razorpayOrderId: row.razorpay_order_id,
+    razorpayPaymentId: row.razorpay_payment_id,
+    paidAt: row.paid_at,
+    paymentError: row.payment_error,
     subtotal: row.subtotal,
     total: row.total,
     placedAt: row.placed_at,

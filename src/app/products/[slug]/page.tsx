@@ -83,7 +83,7 @@ export default async function ProductPage(props: PageProps<"/products/[slug]">) 
         />
 
         <div className="flex flex-col gap-6">
-          <div>
+          <div className="flex flex-col items-start">
             {categoryLabel && (
               <Link
                 href={`/products?category=${product.category}`}
@@ -99,7 +99,7 @@ export default async function ProductPage(props: PageProps<"/products/[slug]">) 
             {reviews.length > 0 && (
               <a
                 href="#reviews"
-                className="mt-2 inline-flex items-center gap-2 text-sm text-zinc-500 hover:underline dark:text-zinc-400"
+                className="mt-2 flex items-center gap-2 text-sm text-zinc-500 hover:underline dark:text-zinc-400"
               >
                 <StarRatingDisplay value={averageRating} size="sm" />
                 <span>
@@ -109,13 +109,17 @@ export default async function ProductPage(props: PageProps<"/products/[slug]">) 
               </a>
             )}
 
-            <Price
-              price={product.price}
-              offerPrice={product.offerPrice}
-              discountPercent={product.discountPercent}
-              size="lg"
-              className="mt-3"
-            />
+            {/* Price renders an inline span, so it needs a block wrapper here:
+                on its own it would flow onto the star line and ignore its
+                own top margin. */}
+            <div className="mt-3">
+              <Price
+                price={product.price}
+                offerPrice={product.offerPrice}
+                discountPercent={product.discountPercent}
+                size="lg"
+              />
+            </div>
             <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
               Inclusive of all taxes
             </p>
