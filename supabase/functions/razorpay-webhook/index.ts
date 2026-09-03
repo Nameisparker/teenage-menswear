@@ -63,6 +63,8 @@ Deno.serve(async (req) => {
             payment_status: "paid",
             razorpay_payment_id: payment.id,
             paid_at: new Date().toISOString(),
+            // A retry that succeeds clears the earlier attempt's reason.
+            payment_error: null,
           })
           .eq("id", order.id);
 
@@ -78,7 +80,13 @@ Deno.serve(async (req) => {
       if (order.payment_status !== "paid") {
         await asService
           .from("orders")
-          .update({ payment_status: "failed" })
+          .update({
+            payment_status: "failed",
+            // Razorpay's own words. error_reason is a code; the description
+            // is the sentence whoever reconciles this can act on.
+            payment_error:
+              payment.error_description ?? payment.error_reason ?? null,
+          })
           .eq("id", order.id);
       }
       return json({ ok: true });

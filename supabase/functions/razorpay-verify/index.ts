@@ -73,6 +73,8 @@ Deno.serve(async (req) => {
           payment_status: "paid",
           razorpay_payment_id: razorpayPaymentId,
           paid_at: new Date().toISOString(),
+          // A retry that succeeds clears the earlier attempt's reason.
+          payment_error: null,
         })
         .eq("id", order.id);
       if (updateError) throw updateError;

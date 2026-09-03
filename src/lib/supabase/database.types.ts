@@ -112,6 +112,8 @@ export type OrderRow = {
   razorpay_order_id: string | null;
   razorpay_payment_id: string | null;
   paid_at: string | null;
+  /** Razorpay's error_description for the last failed attempt, if any. */
+  payment_error: string | null;
 };
 
 export type ProductReviewRow = {

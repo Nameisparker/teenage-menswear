@@ -6,6 +6,7 @@ import { STATUS_LABELS } from "@/lib/order-status";
 import { ProductImage } from "@/components/product-image";
 import { StatusBadge } from "@/components/status-badge";
 import { OrderStatusControl } from "@/components/order-status-control";
+import { PaymentBadge } from "@/components/payment-badge";
 
 export async function generateMetadata(
   props: PageProps<"/admin/orders/[orderNumber]">
@@ -127,6 +128,91 @@ export default async function AdminOrderPage(
             <span>{formatPrice(order.total)}</span>
           </div>
         </div>
+      </section>
+
+      {/* Payment — the money side, deliberately apart from fulfilment above.
+          Reconciling against Razorpay means having the payment id to hand, so
+          it is printed here rather than hunted for by amount and time. */}
+      <section className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="text-lg font-semibold">Payment</h2>
+          <PaymentBadge
+            method={order.paymentMethod}
+            status={order.paymentStatus}
+          />
+        </div>
+
+        <dl className="grid gap-x-8 gap-y-2 text-sm sm:grid-cols-[9rem_1fr]">
+          <dt className="text-zinc-500 dark:text-zinc-400">Amount</dt>
+          <dd className="font-medium">
+            {formatPrice(order.total)}
+            {order.paymentMethod === "cod" &&
+              order.paymentStatus !== "paid" && (
+                <span className="font-normal text-zinc-500 dark:text-zinc-400">
+                  {" "}
+                  &middot; to collect on delivery
+                </span>
+              )}
+          </dd>
+
+          {order.paidAt && (
+            <>
+              <dt className="text-zinc-500 dark:text-zinc-400">Paid at</dt>
+              <dd>
+                {new Date(order.paidAt).toLocaleString("en-IN", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                })}
+              </dd>
+            </>
+          )}
+
+          {order.razorpayPaymentId && (
+            <>
+              <dt className="text-zinc-500 dark:text-zinc-400">Payment id</dt>
+              <dd>
+                <a
+                  href={`https://dashboard.razorpay.com/app/payments/${order.razorpayPaymentId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="break-all font-medium text-accent underline-offset-2 hover:underline"
+                >
+                  {order.razorpayPaymentId}
+                </a>
+              </dd>
+            </>
+          )}
+
+          {order.razorpayOrderId && (
+            <>
+              <dt className="text-zinc-500 dark:text-zinc-400">
+                Razorpay order
+              </dt>
+              <dd className="break-all text-zinc-600 dark:text-zinc-400">
+                {order.razorpayOrderId}
+              </dd>
+            </>
+          )}
+
+          {order.paymentError && (
+            <>
+              <dt className="text-zinc-500 dark:text-zinc-400">Failure</dt>
+              <dd className="text-red-700 dark:text-red-400">
+                {order.paymentError}
+              </dd>
+            </>
+          )}
+        </dl>
+
+        {order.paymentMethod === "razorpay" && order.paymentStatus !== "paid" && (
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            No money has arrived for this order. The customer can retry the
+            payment from checkout — do not pack it while it says this.
+          </p>
+        )}
       </section>
 
       <div className="grid gap-8 sm:grid-cols-2">
