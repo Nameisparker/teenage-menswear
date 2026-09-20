@@ -1,18 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useScrollLock } from "@/lib/use-scroll-lock";
 import { useAuth } from "@/context/auth-context";
-import {
-  DEFAULT_DIAL_CODE,
-  DIAL_CODES,
-  digitsOnly,
-  formatPhoneForDisplay,
-  isValidNationalNumber,
-  toE164,
-} from "@/lib/phone";
+import { digitsOnly } from "@/lib/phone";
 
 const OTP_LENGTH = 6;
 const RESEND_SECONDS = 30;
+
+/**
+ * Deliberately loose. The real check is whether the code arrives; anything
+ * stricter rejects addresses that work, and the input is type="email" anyway.
+ */
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
 
 /**
  * Mounts the dialog only while it is open, so every open starts from a clean
@@ -34,18 +36,18 @@ function AuthDialog() {
     signInWithGoogle,
   } = useAuth();
 
-  const [step, setStep] = useState<"phone" | "otp" | "email">("phone");
+  const [step, setStep] = useState<"start" | "otp" | "password">("start");
+  // Shared by both routes on purpose: someone who switches to the password
+  // form should not have to type their address again.
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [dialCode, setDialCode] = useState(DEFAULT_DIAL_CODE);
-  const [national, setNational] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [resendIn, setResendIn] = useState(0);
 
-  const e164 = toE164(dialCode, national);
-  const phoneValid = isValidNationalNumber(dialCode, national);
+  const trimmedEmail = email.trim();
+  const emailValid = isValidEmail(trimmedEmail);
 
   // Resend cooldown.
   useEffect(() => {
@@ -54,28 +56,23 @@ function AuthDialog() {
     return () => clearTimeout(timer);
   }, [resendIn]);
 
-  // Escape to dismiss, and lock the page scrolling behind the modal.
+  useScrollLock();
+
+  // Escape to dismiss.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") closeAuth();
     }
     document.addEventListener("keydown", onKeyDown);
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = previousOverflow;
-    };
+    return () => document.removeEventListener("keydown", onKeyDown);
   }, [closeAuth]);
 
   async function handleSendOtp(isResend = false) {
-    if (!phoneValid || busy) return;
+    if (!emailValid || busy) return;
     setBusy(true);
     setError(null);
 
-    const { error: sendError } = await sendOtp(e164);
+    const { error: sendError } = await sendOtp(trimmedEmail);
     setBusy(false);
 
     if (sendError) {
@@ -92,7 +89,7 @@ function AuthDialog() {
     setBusy(true);
     setError(null);
 
-    const { error: verifyError } = await verifyOtp(e164, code);
+    const { error: verifyError } = await verifyOtp(trimmedEmail, code);
     // On success the provider closes this modal, so only failure needs handling.
     if (verifyError) {
       setError(verifyError);
@@ -106,7 +103,7 @@ function AuthDialog() {
     setBusy(true);
     setError(null);
 
-    const { error: emailError } = await signInWithEmail(email, password);
+    const { error: emailError } = await signInWithEmail(trimmedEmail, password);
     // On success the provider closes this modal, so only failure needs handling.
     if (emailError) {
       setError(emailError);
@@ -145,13 +142,13 @@ function AuthDialog() {
             <h2 id="auth-modal-title" className="text-lg font-semibold">
               {step === "otp"
                 ? "Enter the code"
-                : step === "email"
-                  ? "Sign in with email"
+                : step === "password"
+                  ? "Sign in with a password"
                   : "Sign in to add to cart"}
             </h2>
             <p className="text-sm text-zinc-600 dark:text-zinc-400">
               {step === "otp"
-                ? `Sent to ${formatPhoneForDisplay(e164)}`
+                ? `Sent to ${trimmedEmail}`
                 : "We keep your cart and orders tied to your account."}
             </p>
           </div>
@@ -185,7 +182,7 @@ function AuthDialog() {
           </p>
         )}
 
-        {step === "phone" ? (
+        {step === "start" ? (
           <div className="flex flex-col gap-4">
             <button
               type="button"
@@ -210,43 +207,29 @@ function AuthDialog() {
                 void handleSendOtp();
               }}
             >
-              <label htmlFor="auth-phone" className="text-sm font-medium">
-                Mobile number
+              <label htmlFor="auth-email" className="text-sm font-medium">
+                Email
               </label>
-              <div className="flex gap-2">
-                <select
-                  aria-label="Country dial code"
-                  value={dialCode}
-                  onChange={(event) => setDialCode(event.target.value)}
-                  className="rounded-md border border-black/15 bg-transparent px-2 py-2 text-sm dark:border-white/20"
-                >
-                  {DIAL_CODES.map((entry) => (
-                    <option key={entry.code} value={entry.code}>
-                      {entry.label}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  id="auth-phone"
-                  type="tel"
-                  inputMode="numeric"
-                  autoComplete="tel-national"
-                  autoFocus
-                  placeholder="93846 26894"
-                  value={national}
-                  onChange={(event) => {
-                    setNational(digitsOnly(event.target.value).slice(0, 14));
-                    setError(null);
-                  }}
-                  className="min-w-0 flex-1 rounded-md border border-black/15 bg-transparent px-3 py-2 text-sm dark:border-white/20"
-                />
-              </div>
+              <input
+                id="auth-email"
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                autoFocus
+                placeholder="you@example.com"
+                value={email}
+                onChange={(event) => {
+                  setEmail(event.target.value);
+                  setError(null);
+                }}
+                className="rounded-md border border-black/15 bg-transparent px-3 py-2 text-sm dark:border-white/20"
+              />
 
               {error && <ErrorText>{error}</ErrorText>}
 
               <button
                 type="submit"
-                disabled={!phoneValid || busy || !configured}
+                disabled={!emailValid || busy || !configured}
                 className="mt-1 flex h-12 w-full items-center justify-center rounded-full bg-accent font-medium text-accent-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
               >
                 {busy ? "Sending..." : "Send code"}
@@ -256,15 +239,15 @@ function AuthDialog() {
             <button
               type="button"
               onClick={() => {
-                setStep("email");
+                setStep("password");
                 setError(null);
               }}
               className="text-sm text-zinc-600 underline-offset-2 hover:underline dark:text-zinc-400"
             >
-              Use email and password instead
+              Use a password instead
             </button>
           </div>
-        ) : step === "email" ? (
+        ) : step === "password" ? (
           <form
             className="flex flex-col gap-3"
             onSubmit={(event) => {
@@ -272,11 +255,11 @@ function AuthDialog() {
               void handleEmail();
             }}
           >
-            <label htmlFor="auth-email" className="text-sm font-medium">
+            <label htmlFor="auth-password-email" className="text-sm font-medium">
               Email
             </label>
             <input
-              id="auth-email"
+              id="auth-password-email"
               type="email"
               autoComplete="email"
               autoFocus
@@ -318,7 +301,7 @@ function AuthDialog() {
             <button
               type="button"
               onClick={() => {
-                setStep("phone");
+                setStep("start");
                 setError(null);
               }}
               className="text-sm text-zinc-600 underline-offset-2 hover:underline dark:text-zinc-400"
@@ -366,12 +349,12 @@ function AuthDialog() {
               <button
                 type="button"
                 onClick={() => {
-                  setStep("phone");
+                  setStep("start");
                   setError(null);
                 }}
                 className="text-zinc-600 underline-offset-2 hover:underline dark:text-zinc-400"
               >
-                Change number
+                Change email
               </button>
               <button
                 type="button"

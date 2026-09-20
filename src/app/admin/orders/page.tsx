@@ -105,6 +105,7 @@ export default async function AdminOrdersPage() {
                       name={line.name}
                       className="h-10 w-10 flex-shrink-0 rounded"
                       sizes="40px"
+                      padding="p-1"
                     />
                     <div className="flex flex-col">
                       <span className="text-sm font-medium">{line.name}</span>

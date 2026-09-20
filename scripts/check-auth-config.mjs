@@ -47,9 +47,9 @@ try {
 
 const checks = [
   {
-    label: "Phone (SMS OTP)",
-    ok: settings.external.phone,
-    fix: `Authentication > Sign In / Providers > Phone — enable it, then add a Test OTP number.\n    https://supabase.com/dashboard/project/${ref}/auth/providers`,
+    label: "Email (OTP + password)",
+    ok: settings.external.email,
+    fix: `Authentication > Sign In / Providers > Email — enable it.\n    https://supabase.com/dashboard/project/${ref}/auth/providers`,
   },
   {
     label: "Google",
@@ -69,7 +69,7 @@ for (const { label, ok, fix } of checks) {
 
 if (allReady) {
   console.log(
-    `\nBoth providers are live. Remember http://localhost:3000/auth/callback must be in\nRedirect URLs: https://supabase.com/dashboard/project/${ref}/auth/url-configuration`
+    `\nBoth providers are live.\n\nFor the emailed code to be a 6-digit OTP rather than a magic link, the "Magic Link"\ntemplate must contain {{ .Token }}:\n    https://supabase.com/dashboard/project/${ref}/auth/templates\n\nRemember http://localhost:3000/auth/callback must be in\nRedirect URLs: https://supabase.com/dashboard/project/${ref}/auth/url-configuration`
   );
 } else {
   console.log("Re-run this after saving in the dashboard.");

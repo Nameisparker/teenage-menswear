@@ -3,7 +3,8 @@
 import { useRef, useState } from "react";
 import { ACCEPTED_IMAGE_TYPES } from "@/lib/images";
 import { uploadProductImage } from "@/lib/product-image-upload";
-import { ProductImage } from "@/components/product-image";
+import { AdminPhoto } from "@/components/admin-photo";
+import { ImageCropper } from "@/components/image-cropper";
 
 /**
  * The product's cover image, uploaded rather than typed.
@@ -18,6 +19,9 @@ export function ImageUploadField({ defaultValue = "" }: { defaultValue?: string 
   const [value, setValue] = useState(defaultValue);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  // The picked file waits here while it is being cropped; nothing is uploaded
+  // until the crop is confirmed.
+  const [cropping, setCropping] = useState<File | null>(null);
 
   /**
    * Names the object after the product being edited.
@@ -50,16 +54,31 @@ export function ImageUploadField({ defaultValue = "" }: { defaultValue?: string 
 
   return (
     <div className="flex flex-col gap-3">
+      {cropping && (
+        <ImageCropper
+          source={cropping}
+          onCancel={() => setCropping(null)}
+          onCropped={(cropped) => {
+            setCropping(null);
+            void upload(cropped);
+          }}
+        />
+      )}
+
       {/* The hidden field is the only thing the Server Action reads. */}
       <input type="hidden" name="imagePath" value={value} />
 
       <div className="flex flex-wrap items-start gap-4">
         {value ? (
-          <ProductImage
+          /* Adjusting only swaps the hidden field, like any other upload —
+             the product's Save is still what commits it. */
+          <AdminPhoto
             image={value}
-            name="Cover image preview"
+            name="Cover image"
             className="h-28 w-28 flex-shrink-0 rounded-md border border-black/10 dark:border-white/10"
             sizes="112px"
+            slugHint={slugHint}
+            onReplaced={(imagePath) => setValue(imagePath)}
           />
         ) : (
           <div className="flex h-28 w-28 flex-shrink-0 items-center justify-center rounded-md border border-dashed border-black/20 text-xs text-zinc-500 dark:border-white/20 dark:text-zinc-400">
@@ -78,7 +97,10 @@ export function ImageUploadField({ defaultValue = "" }: { defaultValue?: string 
               // Cleared so picking the same file twice still fires onChange,
               // which is how a retry after a failed upload works.
               event.target.value = "";
-              if (file) void upload(file);
+              if (file) {
+                setError(null);
+                setCropping(file);
+              }
             }}
             className="text-sm file:mr-3 file:cursor-pointer file:rounded-full file:border-0 file:bg-accent file:px-4 file:py-2 file:text-sm file:font-medium file:text-accent-foreground hover:file:opacity-90 disabled:opacity-60"
           />

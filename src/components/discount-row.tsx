@@ -53,6 +53,7 @@ export function DiscountRow({ product }: { product: AdminProduct }) {
             name={product.name}
             className="h-10 w-10 flex-shrink-0 rounded"
             sizes="40px"
+            padding="p-1"
           />
           <div className="flex flex-col">
             <span className="font-medium">{product.name}</span>

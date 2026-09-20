@@ -85,6 +85,7 @@ export default async function AdminOrderPage(
                         name={line.name}
                         className="h-12 w-12 flex-shrink-0 rounded"
                         sizes="48px"
+                        padding="p-1"
                       />
                       <Link
                         href={`/products/${line.slug}`}

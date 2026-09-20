@@ -45,8 +45,8 @@ type AuthContextValue = {
   authOpen: boolean;
   openAuth: () => void;
   closeAuth: () => void;
-  sendOtp: (phone: string) => Promise<AuthResult>;
-  verifyOtp: (phone: string, token: string) => Promise<AuthResult>;
+  sendOtp: (email: string) => Promise<AuthResult>;
+  verifyOtp: (email: string, token: string) => Promise<AuthResult>;
   signInWithEmail: (email: string, password: string) => Promise<AuthResult>;
   signInWithGoogle: (redirectPath?: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
@@ -69,10 +69,10 @@ function friendlyError(message: string) {
   if (lower.includes("rate limit") || lower.includes("too many")) {
     return "Too many attempts. Please wait a minute and try again.";
   }
-  if (lower.includes("sms") || lower.includes("provider")) {
-    return "SMS sending is not set up on this store yet.";
+  if (lower.includes("email") && lower.includes("send")) {
+    return "Sending the code failed. Email is not set up on this store yet.";
   }
-  // Supabase says "Phone logins are disabled" / "Unsupported provider" when the
+  // Supabase says "Email logins are disabled" / "Unsupported provider" when the
   // provider is switched off in the dashboard.
   if (
     lower.includes("not enabled") ||
@@ -158,23 +158,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearPendingCartAdd();
   }, []);
 
-  const sendOtp = useCallback(async (phone: string): Promise<AuthResult> => {
+  const sendOtp = useCallback(async (email: string): Promise<AuthResult> => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return { error: "Sign-in is not configured yet." };
 
-    const { error } = await supabase.auth.signInWithOtp({ phone });
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      // A first-time shopper signs in and signs up in the same step, which is
+      // what the phone flow this replaced also did.
+      options: { shouldCreateUser: true },
+    });
     return { error: error ? friendlyError(error.message) : null };
   }, []);
 
   const verifyOtp = useCallback(
-    async (phone: string, token: string): Promise<AuthResult> => {
+    async (email: string, token: string): Promise<AuthResult> => {
       const supabase = getSupabaseBrowserClient();
       if (!supabase) return { error: "Sign-in is not configured yet." };
 
+      // "email" covers both a first sign-up and a later sign-in; the older
+      // "magiclink" type only works for an account that already exists.
       const { error } = await supabase.auth.verifyOtp({
-        phone,
+        email,
         token,
-        type: "sms",
+        type: "email",
       });
       return { error: error ? friendlyError(error.message) : null };
     },

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getAllProducts, getCategoryOptions } from "@/lib/admin-catalog";
 import { formatPrice } from "@/lib/format";
 import { ProductImage } from "@/components/product-image";
+import { DeleteProductButton } from "@/components/delete-product-button";
 
 export const metadata = { title: "Admin Products" };
 
@@ -105,6 +106,7 @@ export default async function AdminProductsPage(
                       name={product.name}
                       className="h-10 w-10 flex-shrink-0 rounded"
                       sizes="40px"
+                      padding="p-1"
                     />
                     <div className="flex flex-col">
                       <span className="font-medium">{product.name}</span>
@@ -157,12 +159,18 @@ export default async function AdminProductsPage(
                   </div>
                 </td>
                 <td className="py-3 text-right">
-                  <Link
-                    href={`/admin/products/${product.id}`}
-                    className="font-medium text-accent underline-offset-2 hover:underline"
-                  >
-                    Edit
-                  </Link>
+                  <div className="flex items-start justify-end gap-4">
+                    <Link
+                      href={`/admin/products/${product.id}`}
+                      className="font-medium text-accent underline-offset-2 hover:underline"
+                    >
+                      Edit
+                    </Link>
+                    <DeleteProductButton
+                      productId={product.id}
+                      productName={product.name}
+                    />
+                  </div>
                 </td>
               </tr>
             ))}

@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getCategoryOptions, getProductById } from "@/lib/admin-catalog";
 import { ProductForm } from "@/components/product-form";
 import { GalleryEditor } from "@/components/gallery-editor";
+import { DeleteProductButton } from "@/components/delete-product-button";
 
 export default async function EditProductPage(
   props: PageProps<"/admin/products/[id]">
@@ -30,6 +31,24 @@ export default async function EditProductPage(
       <ProductForm product={product} categories={categories}>
         <GalleryEditor product={product} />
       </ProductForm>
+
+      {/* Below the form, not in it: a destructive action does not belong next
+          to Save, where a misread click costs a product. */}
+      <div className="flex max-w-2xl flex-col gap-2 border-t border-black/10 pt-6 dark:border-white/10">
+        <span className="text-sm font-semibold">Delete this product</span>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          Removes it from the catalog for good, along with its sizes, images
+          and reviews. Past orders keep their record of it. To take it off the
+          storefront without losing it, hide it instead.
+        </p>
+        <div className="pt-1">
+          <DeleteProductButton
+            productId={product.id}
+            productName={product.name}
+            redirectTo="/admin/products"
+          />
+        </div>
+      </div>
     </div>
   );
 }

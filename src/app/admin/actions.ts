@@ -370,6 +370,52 @@ export async function addProductImage(
  * The row is read before it is deleted because the path is needed afterwards,
  * and reading it back once it is gone is not an option.
  */
+/**
+ * Points a gallery row at a re-cropped file, keeping its place in the strip.
+ *
+ * Remove-then-add would work but would send the image to the end of the
+ * order, which is the wrong answer for "I adjusted the second photo".
+ */
+export async function replaceProductImage(
+  imageId: string,
+  imagePath: string
+): Promise<ActionResult> {
+  const { supabase, error: adminError } = await requireAdmin();
+  if (!supabase) return { ok: false, error: adminError ?? "Unauthorised." };
+
+  const { data: existing, error: readError } = await supabase
+    .from("product_images")
+    .select("image_path")
+    .eq("id", imageId)
+    .maybeSingle();
+
+  if (readError) {
+    return failed("replaceProductImage read", readError.message, "Could not replace the image.");
+  }
+
+  const { error } = await supabase
+    .from("product_images")
+    .update({ image_path: imagePath })
+    .eq("id", imageId);
+
+  if (error) {
+    return failed("replaceProductImage", error.message, "Could not replace the image.");
+  }
+
+  // The old file is only deleted once nothing references it — it may still be
+  // another product's cover, which deleteUnusedImage checks for.
+  const previous = (existing as { image_path: string } | null)?.image_path;
+  if (previous && previous !== imagePath) {
+    await deleteUnusedImage(supabase, previous);
+  }
+
+  revalidatePath("/");
+  revalidatePath("/products");
+  revalidatePath("/products/[slug]", "page");
+  revalidatePath("/admin/products/[id]", "page");
+  return { ok: true };
+}
+
 export async function removeProductImage(imageId: string): Promise<ActionResult> {
   const { supabase, error: adminError } = await requireAdmin();
   if (!supabase) return { ok: false, error: adminError ?? "Unauthorised." };
@@ -419,6 +465,59 @@ export async function setProductActive(
   revalidatePath("/");
   revalidatePath("/products");
   revalidatePath("/admin/products");
+  return { ok: true };
+}
+
+
+/**
+ * Deletes a product outright.
+ *
+ * Safe to do because of how the schema is shaped, which is worth stating
+ * plainly: product_variants, product_images, product_reviews and cart_items
+ * all cascade, while order_items.product_id is ON DELETE SET NULL and the row
+ * already snapshots name, slug and price. Past orders therefore keep reading
+ * correctly — a deleted product leaves order history intact, not dangling.
+ *
+ * Hiding remains the better default for something that might come back, which
+ * is why setProductActive exists. This is for the mistake and the retired
+ * line, where a permanently hidden row is just clutter.
+ */
+export async function deleteProduct(productId: string): Promise<ActionResult> {
+  const { supabase, error: adminError } = await requireAdmin();
+  if (!supabase) return { ok: false, error: adminError ?? "Unauthorised." };
+
+  // Read the image paths first: once the rows are gone, so is any record of
+  // which objects in storage they were using.
+  const [{ data: product }, { data: gallery }] = await Promise.all([
+    supabase.from("products").select("slug, image_path").eq("id", productId).maybeSingle(),
+    supabase.from("product_images").select("image_path").eq("product_id", productId),
+  ]);
+
+  if (!product) return { ok: false, error: "That product no longer exists." };
+
+  const { error } = await supabase.from("products").delete().eq("id", productId);
+
+  if (error) {
+    return failed("deleteProduct", error.message, "Could not delete the product.");
+  }
+
+  // After the delete, so the "is anything still using this?" check sees the
+  // rows already gone. Failures here are logged and swallowed inside.
+  const paths = [
+    product.image_path as string | null,
+    ...(gallery ?? []).map((row) => row.image_path as string),
+  ].filter((path): path is string => Boolean(path));
+
+  for (const path of new Set(paths)) {
+    await deleteUnusedImage(supabase, path);
+  }
+
+  revalidatePath("/");
+  revalidatePath("/products");
+  revalidatePath(`/products/${product.slug}`);
+  revalidatePath("/admin/products");
+  revalidatePath("/admin/featured");
+  revalidatePath("/admin");
   return { ok: true };
 }
 
