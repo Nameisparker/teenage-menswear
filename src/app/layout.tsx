@@ -12,6 +12,7 @@ import { PendingCartAdd } from "@/components/pending-cart-add";
 import { Header } from "@/components/header";
 import { AuthErrorBanner } from "@/components/auth-error-banner";
 import { Footer } from "@/components/footer";
+import { BackToTop } from "@/components/back-to-top";
 
 /**
  * Poppins is not a variable font on Google Fonts, so the weights have to be
@@ -82,6 +83,9 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
               </Suspense>
               <main className="flex-1">{children}</main>
               <Footer />
+              {/* Floats over every page, so it lives here rather than in the
+                  footer it used to sit inside. */}
+              <BackToTop />
               <AuthModal />
               <PendingCartAdd />
             </NewOrdersProvider>

@@ -236,7 +236,7 @@ export default async function Home() {
 
       {/* Visit us */}
       <section className="border-t border-black/10 bg-zinc-50 dark:border-white/10 dark:bg-zinc-950">
-        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+        <div className="mx-auto flex max-w-6xl flex-col items-start gap-10 px-4 py-16 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-col gap-4">
             <h2 className="text-2xl font-semibold tracking-tight">
               Visit us in-store
@@ -255,6 +255,26 @@ export default async function Home() {
                 {STORE.phoneDisplay}
               </a>
             </div>
+          </div>
+
+          {/* Fills the empty half this section used to leave on wide screens.
+              Below lg it drops under the address rather than squeezing
+              alongside it. */}
+          <div className="flex flex-col items-start gap-3 lg:items-center lg:text-center">
+            <Image
+              src="/logo.png"
+              alt=""
+              width={320}
+              height={270}
+              className="h-24 w-auto lg:h-32"
+            />
+            <span className="text-lg font-bold tracking-tight">
+              {STORE.name}
+            </span>
+            <p className="max-w-xs text-sm text-zinc-500 dark:text-zinc-400">
+              {STORE.tagline} Shirts, pants, tees, and accessories built for
+              everyday wear.
+            </p>
           </div>
         </div>
       </section>
