@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useCart } from "@/context/cart-context";
 import { useAuth } from "@/context/auth-context";
@@ -39,15 +40,28 @@ export function Header({
             {menuOpen ? <CloseIcon /> : <MenuIcon />}
           </button>
 
-          <Link href="/" className="flex flex-col leading-none">
-            <span className="text-lg font-bold tracking-tight">
-              {firstWord.toUpperCase()}
-            </span>
-            {secondLine && (
-              <span className="text-[10px] font-medium tracking-[0.25em] text-accent">
-                {secondLine.toUpperCase()}
+          <Link href="/" className="flex items-center gap-2.5">
+            {/* Intrinsic size is the display size, not the file's 720px: the
+                optimiser serves what is asked for, and a header mark never
+                needs more than this at 2x. */}
+            <Image
+              src="/logo.png"
+              alt=""
+              width={96}
+              height={81}
+              priority
+              className="h-9 w-auto"
+            />
+            <span className="flex flex-col leading-none">
+              <span className="text-lg font-bold tracking-tight">
+                {firstWord.toUpperCase()}
               </span>
-            )}
+              {secondLine && (
+                <span className="text-[10px] font-medium tracking-[0.25em] text-accent">
+                  {secondLine.toUpperCase()}
+                </span>
+              )}
+            </span>
           </Link>
         </div>
 
