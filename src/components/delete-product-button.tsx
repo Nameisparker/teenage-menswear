@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { useScrollLock } from "@/lib/use-scroll-lock";
+import { useDialog } from "@/lib/use-dialog";
 import { deleteProduct } from "@/app/admin/actions";
 
 /**
@@ -71,16 +71,7 @@ function ConfirmDeleteDialog({
     cancelRef.current?.focus();
   }, []);
 
-  useScrollLock();
-
-  // Escape to dismiss.
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
+  useDialog(onClose);
 
   function handleDelete() {
     setError(null);

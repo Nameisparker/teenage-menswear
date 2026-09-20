@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useScrollLock } from "@/lib/use-scroll-lock";
+import { useDialog } from "@/lib/use-dialog";
 import { useAuth } from "@/context/auth-context";
 import { digitsOnly } from "@/lib/phone";
 
@@ -56,16 +56,7 @@ function AuthDialog() {
     return () => clearTimeout(timer);
   }, [resendIn]);
 
-  useScrollLock();
-
-  // Escape to dismiss.
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") closeAuth();
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [closeAuth]);
+  useDialog(closeAuth);
 
   async function handleSendOtp(isResend = false) {
     if (!emailValid || busy) return;

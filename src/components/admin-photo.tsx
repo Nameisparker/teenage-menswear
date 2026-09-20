@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useScrollLock } from "@/lib/use-scroll-lock";
+import { useState } from "react";
+import { useDialog } from "@/lib/use-dialog";
 import { ImageCropper } from "@/components/image-cropper";
 import { ProductImage } from "@/components/product-image";
 import { productImageSrc } from "@/lib/images";
@@ -85,17 +85,10 @@ function PhotoDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useScrollLock();
-
-  // Escape dismisses the viewer, but not while the cropper is over it — that
-  // one handles its own Escape and should only step back a level.
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape" && !adjusting) onClose();
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onClose, adjusting]);
+  // Escape steps back one level: the cropper registers above this dialog
+  // while it is open, so it answers first and this one only closes once the
+  // cropper has gone.
+  useDialog(onClose);
 
   async function handleCropped(cropped: File) {
     setAdjusting(false);

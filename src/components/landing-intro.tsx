@@ -8,6 +8,7 @@ import {
 } from "react";
 import Image from "next/image";
 import ParticleText from "./particle-text";
+import { acquireScrollLock, releaseScrollLock } from "@/lib/scroll-lock";
 
 const GATHER_DURATION = 1400;
 const STAGGER = 350;
@@ -60,12 +61,23 @@ export function LandingIntro({
   useEffect(() => {
     if (prefersReducedMotion) return;
 
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+    // Through the counted lock rather than writing body.overflow directly.
+    // The intro releases on its own timer, so a plain restore would hand the
+    // page back while a dialog opened during it — the sign-in prompt after an
+    // OAuth redirect lands on exactly this screen — was still holding it.
+    const style = document.body.style;
+    acquireScrollLock(style);
+    // Released once, whether that happens on the timer or on unmount.
+    let held = true;
+    const release = () => {
+      if (!held) return;
+      held = false;
+      releaseScrollLock(style);
+    };
 
     const revealTimer = window.setTimeout(() => {
       setTimerRevealed(true);
-      document.body.style.overflow = previousOverflow;
+      release();
     }, REVEAL_AT_MS);
 
     const hideOverlayTimer = window.setTimeout(() => {
@@ -75,7 +87,7 @@ export function LandingIntro({
     return () => {
       window.clearTimeout(revealTimer);
       window.clearTimeout(hideOverlayTimer);
-      document.body.style.overflow = previousOverflow;
+      release();
     };
   }, [prefersReducedMotion]);
 

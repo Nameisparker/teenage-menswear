@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useScrollLock } from "@/lib/use-scroll-lock";
+import { useDialog } from "@/lib/use-dialog";
 import { fetchQuickView } from "@/app/products/actions";
 import { AddToCartButton } from "@/components/add-to-cart-button";
 import { Price } from "@/components/price";
@@ -65,16 +65,7 @@ function QuickViewDialog({
     };
   }, [slug]);
 
-  useScrollLock();
-
-  // Escape to dismiss.
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
+  useDialog(onClose);
 
   return (
     <div

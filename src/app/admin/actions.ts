@@ -162,23 +162,38 @@ async function deleteUnusedImage(
     return;
   }
 
-  const [covers, gallery] = await Promise.all([
+  const [covers, gallery, ordered] = await Promise.all([
     supabase.from("products").select("id").eq("image_path", imagePath).limit(1),
     supabase
       .from("product_images")
       .select("id")
       .eq("image_path", imagePath)
       .limit(1),
+    // Order lines snapshot the cover they were bought with and render it on
+    // every order screen. They outlive the product — order_items.product_id is
+    // ON DELETE SET NULL — so without this a deleted product takes the photo
+    // out from under order history and leaves broken thumbnails behind.
+    supabase
+      .from("order_items")
+      .select("id")
+      .eq("image_path", imagePath)
+      .limit(1),
   ]);
 
-  if (covers.error || gallery.error) {
+  if (covers.error || gallery.error || ordered.error) {
     console.error(
       "deleteUnusedImage lookup:",
-      covers.error?.message ?? gallery.error?.message
+      covers.error?.message ?? gallery.error?.message ?? ordered.error?.message
     );
     return;
   }
-  if (covers.data.length > 0 || gallery.data.length > 0) return;
+  if (
+    covers.data.length > 0 ||
+    gallery.data.length > 0 ||
+    ordered.data.length > 0
+  ) {
+    return;
+  }
 
   const { error: removeError } = await supabase.storage
     .from(PRODUCT_IMAGE_BUCKET)
@@ -393,6 +408,14 @@ export async function replaceProductImage(
     return failed("replaceProductImage read", readError.message, "Could not replace the image.");
   }
 
+  // Two admins on the same product: one removes an image while the other is
+  // re-cropping it. Without this the update matches nothing, Postgres reports
+  // no error, and the second admin is told it worked while the gallery is
+  // unchanged and the file they just uploaded is orphaned in the bucket.
+  if (!existing) {
+    return { ok: false, error: "That image has already been removed." };
+  }
+
   const { error } = await supabase
     .from("product_images")
     .update({ image_path: imagePath })
@@ -488,12 +511,19 @@ export async function deleteProduct(productId: string): Promise<ActionResult> {
 
   // Read the image paths first: once the rows are gone, so is any record of
   // which objects in storage they were using.
-  const [{ data: product }, { data: gallery }] = await Promise.all([
+  const [productRead, galleryRead] = await Promise.all([
     supabase.from("products").select("slug, image_path").eq("id", productId).maybeSingle(),
     supabase.from("product_images").select("image_path").eq("product_id", productId),
   ]);
 
-  if (!product) return { ok: false, error: "That product no longer exists." };
+  // Told apart from a missing row on purpose: reporting "no longer exists" for
+  // a product that is fine, because one read blipped, sends an admin looking
+  // for a deletion that never happened.
+  if (productRead.error) {
+    return failed("deleteProduct read", productRead.error.message, "Could not delete the product.");
+  }
+  if (!productRead.data) return { ok: false, error: "That product no longer exists." };
+  const product = productRead.data;
 
   const { error } = await supabase.from("products").delete().eq("id", productId);
 
@@ -503,9 +533,16 @@ export async function deleteProduct(productId: string): Promise<ActionResult> {
 
   // After the delete, so the "is anything still using this?" check sees the
   // rows already gone. Failures here are logged and swallowed inside.
+  // A failed gallery read means the paths are unknown, not that there were
+  // none — logged rather than silently skipped, so an orphaned object in the
+  // bucket has something to trace it back to.
+  if (galleryRead.error) {
+    console.error("deleteProduct gallery read:", galleryRead.error.message);
+  }
+
   const paths = [
     product.image_path as string | null,
-    ...(gallery ?? []).map((row) => row.image_path as string),
+    ...(galleryRead.data ?? []).map((row) => row.image_path as string),
   ].filter((path): path is string => Boolean(path));
 
   for (const path of new Set(paths)) {

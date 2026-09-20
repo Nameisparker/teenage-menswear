@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useScrollLock } from "@/lib/use-scroll-lock";
+import { useDialog } from "@/lib/use-dialog";
 import {
   baseScale,
   clampOffset,
@@ -134,16 +134,7 @@ export function ImageCropper({
     draw(context, FRAME_SIZE, image);
   }, [draw, image]);
 
-  useScrollLock();
-
-  // Escape to dismiss.
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onCancel();
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onCancel]);
+  useDialog(onCancel);
 
   function handlePointerDown(event: React.PointerEvent<HTMLCanvasElement>) {
     if (!image) return;
@@ -180,6 +171,24 @@ export function ImageCropper({
     ? scale / baseScale(sizeOf(image), FRAME_SIZE, "contain")
     : 1;
 
+  /**
+   * The top of the range has to reach "Fill" or the slider lies about where
+   * the photo is. On a panorama, cover can be eight times contain — the
+   * handle would sit pinned at 4 until the first nudge yanked the photo
+   * smaller than the square it had been filling.
+   *
+   * Derived from the image, never from the current zoom: a max that tracks
+   * its own value pins the handle to the right-hand end, and every drag
+   * re-widens the track and snaps it back there.
+   */
+  const maxZoom = image
+    ? Math.max(
+        MAX_ZOOM,
+        baseScale(sizeOf(image), FRAME_SIZE, "cover") /
+          baseScale(sizeOf(image), FRAME_SIZE, "contain")
+      )
+    : MAX_ZOOM;
+
   async function handleUse() {
     if (!image) return;
     setWorking(true);
@@ -198,9 +207,23 @@ export function ImageCropper({
 
     // WebP, with alpha: "Fit" leaves the corners empty, and the storefront
     // shows product images over its own background rather than a white block.
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, "image/webp", 0.92)
-    );
+    //
+    // Guarded because toBlob throws on a canvas tainted by a cross-origin
+    // source. Unhandled, the rejection escaped this function with `working`
+    // still true, which left the button stuck on "Preparing…" and the backdrop
+    // refusing to close — no error, no way out but a reload.
+    let blob: Blob | null = null;
+    try {
+      blob = await new Promise<Blob | null>((resolve, reject) => {
+        try {
+          canvas.toBlob(resolve, "image/webp", 0.92);
+        } catch (encodeError) {
+          reject(encodeError);
+        }
+      });
+    } catch (encodeError) {
+      console.error("crop encode failed", encodeError);
+    }
     setWorking(false);
 
     if (!blob) {
@@ -264,7 +287,7 @@ export function ImageCropper({
           <input
             type="range"
             min={MIN_ZOOM}
-            max={MAX_ZOOM}
+            max={maxZoom}
             step={0.01}
             value={zoomValue}
             onChange={(event) => changeZoom(Number(event.target.value))}
