@@ -5,7 +5,7 @@ import { LOW_STOCK, restockList, summariseOrders } from "@/lib/inventory";
 import { formatPrice } from "@/lib/format";
 import type { InventoryProduct, SizeLine } from "@/lib/inventory";
 
-export const metadata = { title: "Admin — Dashboard" };
+export const metadata = { title: "Admin Dashboard" };
 
 /** Beyond this the restock list stops being a list and becomes the report below. */
 const RESTOCK_LIMIT = 20;

@@ -40,9 +40,9 @@ export async function generateMetadata(): Promise<Metadata> {
     // one, which Open Graph and Twitter cards require.
     metadataBase: new URL(SITE_URL),
     title: {
-      default: `${store.name} — ${categoryList}`,
-      // Page titles read "Breton Stripe Tee — Teenage Menswear".
-      template: `%s — ${store.name}`,
+      default: store.name,
+      // Page titles read "Breton Stripe Tee Teenage Menswear".
+      template: `%s ${store.name}`,
     },
     description,
     openGraph: {

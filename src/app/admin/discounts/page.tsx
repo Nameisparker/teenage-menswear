@@ -2,7 +2,7 @@ import { getAllProducts } from "@/lib/admin-catalog";
 import { formatPrice } from "@/lib/format";
 import { DiscountRow } from "@/components/discount-row";
 
-export const metadata = { title: "Admin — Discounts" };
+export const metadata = { title: "Admin Discounts" };
 
 export default async function AdminDiscountsPage() {
   const products = await getAllProducts();

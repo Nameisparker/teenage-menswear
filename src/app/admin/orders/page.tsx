@@ -5,7 +5,7 @@ import { ProductImage } from "@/components/product-image";
 import { OrderStatusControl } from "@/components/order-status-control";
 import { PaymentBadge } from "@/components/payment-badge";
 
-export const metadata = { title: "Admin — Orders" };
+export const metadata = { title: "Admin Orders" };
 
 /** Beyond this, the row lists a count instead of every thumbnail. */
 const PREVIEW_LIMIT = 4;

@@ -1,7 +1,7 @@
 import { getCategoryOptions } from "@/lib/admin-catalog";
 import { ProductForm } from "@/components/product-form";
 
-export const metadata = { title: "Admin — New product" };
+export const metadata = { title: "Admin New product" };
 
 export default async function NewProductPage() {
   const categories = await getCategoryOptions();

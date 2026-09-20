@@ -5,7 +5,7 @@ import { ProductImage } from "@/components/product-image";
 import { FeaturedToggle } from "@/components/featured-toggle";
 import type { AdminProduct } from "@/lib/admin-catalog";
 
-export const metadata = { title: "Admin — Featured" };
+export const metadata = { title: "Admin Featured" };
 
 /** One row, shared by both tables so the two lists stay visually identical. */
 function ProductRow({ product }: { product: AdminProduct }) {

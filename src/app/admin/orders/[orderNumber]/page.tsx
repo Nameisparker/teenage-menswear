@@ -12,7 +12,7 @@ export async function generateMetadata(
   props: PageProps<"/admin/orders/[orderNumber]">
 ) {
   const { orderNumber } = await props.params;
-  return { title: `Admin — Order ${orderNumber}` };
+  return { title: `Admin Order ${orderNumber}` };
 }
 
 export default async function AdminOrderPage(

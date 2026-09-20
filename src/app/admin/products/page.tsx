@@ -3,7 +3,7 @@ import { getAllProducts, getCategoryOptions } from "@/lib/admin-catalog";
 import { formatPrice } from "@/lib/format";
 import { ProductImage } from "@/components/product-image";
 
-export const metadata = { title: "Admin — Products" };
+export const metadata = { title: "Admin Products" };
 
 export default async function AdminProductsPage(
   props: PageProps<"/admin/products">
