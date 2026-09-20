@@ -6,6 +6,7 @@ import {
   useSyncExternalStore,
   type ReactNode,
 } from "react";
+import Image from "next/image";
 import ParticleText from "./particle-text";
 
 const GATHER_DURATION = 1400;
@@ -88,21 +89,34 @@ export function LandingIntro({
           style={{ transitionDuration: `${CROSSFADE_MS}ms` }}
           aria-hidden="true"
         >
-          <div className="w-full max-w-4xl px-6" style={{ height: 180 }}>
-            <ParticleText
-              text={title}
-              trigger="mount"
-              gatherDuration={GATHER_DURATION}
-              stagger={STAGGER}
-              scatter={220}
-              density={3}
-              particleSize={2}
-              color="#ffffff"
-              highlightColor="#d97706"
-              fontSize="clamp(2.25rem, 9vw, 3.75rem)"
-              fontWeight={700}
-              glow
+          <div className="flex w-full max-w-4xl flex-col items-center gap-6 px-6">
+            {/* The mark holds the frame while the name assembles beneath it.
+                Decorative: the overlay is aria-hidden, and the page behind it
+                carries the real heading. */}
+            <Image
+              src="/logo.png"
+              alt=""
+              width={240}
+              height={203}
+              priority
+              className="h-20 w-auto sm:h-28"
             />
+            <div className="w-full" style={{ height: 180 }}>
+              <ParticleText
+                text={title}
+                trigger="mount"
+                gatherDuration={GATHER_DURATION}
+                stagger={STAGGER}
+                scatter={220}
+                density={3}
+                particleSize={2}
+                color="#ffffff"
+                highlightColor="#d97706"
+                fontSize="clamp(2.25rem, 9vw, 3.75rem)"
+                fontWeight={700}
+                glow
+              />
+            </div>
           </div>
         </div>
       )}

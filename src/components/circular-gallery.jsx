@@ -17,6 +17,21 @@ function lerp(p1, p2, t) {
   return p1 + (p2 - p1) * t;
 }
 
+// Gap between two products, in world units.
+const ITEM_PADDING = 2;
+
+/**
+ * Width of one product slot in world units.
+ *
+ * Mirrors what Media.onResize works out for itself, and exists so App can
+ * decide how many copies of the catalog the belt needs *before* a single
+ * Media — and its texture — has been built.
+ */
+function itemWidth(screen, viewport) {
+  const scale = screen.height / 1500;
+  return (viewport.width * (700 * scale)) / screen.width + ITEM_PADDING;
+}
+
 function autoBind(instance) {
   const proto = Object.getPrototypeOf(instance);
   Object.getOwnPropertyNames(proto).forEach((key) => {
@@ -370,7 +385,7 @@ class Media {
     this.plane.scale.y = (this.viewport.height * (900 * this.scale)) / this.screen.height;
     this.plane.scale.x = (this.viewport.width * (700 * this.scale)) / this.screen.width;
     this.plane.program.uniforms.uPlaneSizes.value = [this.plane.scale.x, this.plane.scale.y];
-    this.padding = 2;
+    this.padding = ITEM_PADDING;
     this.width = this.plane.scale.x + this.padding;
     this.widthTotal = this.width * this.length;
     this.x = this.width * this.index;
@@ -451,7 +466,40 @@ class App {
       { image: `https://picsum.photos/seed/12/800/600?grayscale`, text: "Palm Trees" }
     ];
     const galleryItems = items && items.length ? items : defaultItems;
-    this.mediasImages = galleryItems.concat(galleryItems);
+
+    /**
+     * How many times the catalog is laid end to end.
+     *
+     * The belt has to be wider than the screen, or the recycling in
+     * Media.update() — which only moves an item once it has fully left one
+     * edge — has nothing to show in the gap it leaves behind. Four products
+     * on a wide monitor covered barely half the viewport, so the other half
+     * stayed empty until the drift had carried the strip all the way round.
+     *
+     * Two copies stays the floor, which is what a catalog long enough to
+     * overflow on its own already got. Twice the viewport leaves headroom for
+     * a resize, which relays the existing items rather than building more,
+     * and the cap keeps a one-product catalog on an ultra-wide monitor from
+     * asking for dozens of textures.
+     */
+    const width = itemWidth(this.screen, this.viewport);
+    const copies = Math.min(
+      12,
+      Math.max(
+        2,
+        Math.ceil((this.viewport.width * 2) / (galleryItems.length * width))
+      )
+    );
+    this.mediasImages = Array.from({ length: copies }, () => galleryItems).flat();
+
+    /**
+     * Start half a belt in, so the first frame already has products either
+     * side of centre. From a standing start every item sits at x >= 0 — the
+     * whole left half of the section is blank until the strip drifts across.
+     * Rounded to a whole slot to agree with the snapping in onCheck().
+     */
+    const startAt = Math.round(this.mediasImages.length / 2) * width;
+    this.scroll.current = this.scroll.target = this.scroll.last = startAt;
     this.medias = this.mediasImages.map((data, index) => {
       return new Media({
         geometry: this.planeGeometry,
