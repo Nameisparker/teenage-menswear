@@ -10,6 +10,7 @@ import {
 import { ProductCard } from "@/components/product-card";
 import { ProductImage } from "@/components/product-image";
 import { LandingIntro } from "@/components/landing-intro";
+import { BACK_BAR_ID } from "@/lib/back-bar";
 import { CircularGallerySection } from "@/components/circular-gallery-section";
 
 export const revalidate = 60;
@@ -75,7 +76,23 @@ export default async function Home() {
   }));
 
   return (
-    <LandingIntro title={STORE.name}>
+    <>
+      {/*
+        The app-wide Back bar lives in the root layout and has nowhere to go
+        back to from here, so this page hides it.
+
+        A CSS rule rather than a condition inside the button: the button is a
+        Client Component, and deciding its visibility from usePathname() means
+        the server and the browser can disagree — which is what put a stray
+        Back button on this page in production. See components/back-button.tsx.
+
+        Kept out of <LandingIntro>, which is a Client Component: this rule has
+        to be in the HTML whenever the bar is, and client output is exactly what
+        cannot be relied on here. As a Server Component's own markup it always
+        ships with the page.
+      */}
+      <style>{`#${BACK_BAR_ID}{display:none}`}</style>
+      <LandingIntro title={STORE.name}>
       <div className="flex flex-col">
       {/* Hero */}
       <section className="relative isolate flex min-h-[560px] items-center overflow-hidden text-white sm:min-h-[640px] lg:min-h-[760px]">
@@ -279,7 +296,8 @@ export default async function Home() {
         </div>
       </section>
       </div>
-    </LandingIntro>
+      </LandingIntro>
+    </>
   );
 }
 

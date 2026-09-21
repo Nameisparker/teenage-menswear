@@ -2,11 +2,29 @@
 
 import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { BACK_BAR_ID } from "@/lib/back-bar";
 
 /**
  * "Back" for the whole app, under the header.
  *
- * Hidden on the home page, which has nowhere to go back to within the store.
+ * Rendered on every route, including the home page, and hidden there by a rule
+ * the home page serves itself — see the hide rule in app/page.tsx.
+ *
+ * It reads better as `if (pathname === "/") return null`, which is what this
+ * used to do, and it is wrong: usePathname() is a client hook, so on the server
+ * its value comes from the route being rendered, and a project with a Proxy
+ * file (ours gates /admin, /orders and /account) cannot rely on that matching
+ * the browser pathname. next/dist/docs/01-app/03-api-reference/04-functions/
+ * use-pathname.md calls this out directly. In production the prerendered home
+ * page came back with a pathname that was not "/", so the server shipped this
+ * button and the client removed it — a hydration mismatch that left a Back
+ * button sitting on the home page and, after a navigation, an orphaned second
+ * copy on top of the real one elsewhere. Neither reproduced in `next dev` or in
+ * a local `next build`, which is what makes it worth this much comment.
+ *
+ * So the markup is now identical on every route and one CSS rule decides. The
+ * pathname is still read below, but only for the click target, which runs well
+ * after hydration.
  */
 export function BackButton() {
   const router = useRouter();
@@ -30,8 +48,6 @@ export function BackButton() {
     navigated.current = pathname !== firstPath.current;
   }, [pathname]);
 
-  if (pathname === "/") return null;
-
   const goBack = () => {
     if (navigated.current) router.back();
     // Nowhere of ours to return to, so offer the obvious destination instead.
@@ -39,7 +55,10 @@ export function BackButton() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 pt-4 sm:px-6">
+    <div
+      id={BACK_BAR_ID}
+      className="mx-auto w-full max-w-6xl px-4 pt-4 sm:px-6"
+    >
       <button
         type="button"
         onClick={goBack}
